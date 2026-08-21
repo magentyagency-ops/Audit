@@ -10,10 +10,23 @@ export type Profile = { id: string; email: string; full_name: string; role: Role
  * chaque appel à l'API de mission est revérifié côté serveur avec le jeton.
  */
 
-export async function currentProfile(): Promise<Profile | null> {
-  const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
-  if (sessionError) throw new Error(`Session illisible : ${sessionError.message}`)
-  const user = sessionData.session?.user
+export type SessionUser = { id: string; email?: string }
+
+/**
+ * Profil du compte connecté.
+ *
+ * `known` permet d'enchaîner directement sur la session que vient de renvoyer
+ * la connexion, sans repasser par le stockage du navigateur : certaines
+ * configurations (navigation privée, blocage du stockage, extension) relisent
+ * une session vide juste après une authentification pourtant réussie.
+ */
+export async function currentProfile(known?: SessionUser): Promise<Profile | null> {
+  let user: SessionUser | undefined = known
+  if (!user) {
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+    if (sessionError) throw new Error(`Session illisible : ${sessionError.message}`)
+    user = sessionData.session?.user
+  }
   if (!user) return null
 
   const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
@@ -25,9 +38,20 @@ export async function currentProfile(): Promise<Profile | null> {
   return data as Profile
 }
 
-export async function signIn(email: string, password: string): Promise<void> {
-  const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
+export async function signIn(email: string, password: string): Promise<SessionUser> {
+  const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
   if (error) throw new Error(error.message === 'Invalid login credentials' ? 'Email ou mot de passe incorrect.' : error.message)
+  if (!data.user) throw new Error('Connexion refusée par Supabase.')
+  return data.user
+}
+
+/** Purge une session locale corrompue, pour qu'un rechargement reparte proprement. */
+export function clearStoredSession() {
+  try {
+    for (const key of Object.keys(window.localStorage)) {
+      if (key.startsWith('sb-') && key.endsWith('-auth-token')) window.localStorage.removeItem(key)
+    }
+  } catch { /* stockage indisponible : il n'y a alors rien à purger */ }
 }
 
 export async function signOut(): Promise<void> {

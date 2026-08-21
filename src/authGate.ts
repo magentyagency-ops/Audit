@@ -1,4 +1,4 @@
-import { currentProfile, onAuthChange, sendPasswordReset, signIn, signOut, updateOwnPassword, type Profile } from './auth.js'
+import { clearStoredSession, currentProfile, onAuthChange, sendPasswordReset, signIn, signOut, updateOwnPassword, type Profile, type SessionUser } from './auth.js'
 
 /**
  * Écran de connexion partagé par le tableau de bord et l'espace de mission.
@@ -48,9 +48,10 @@ function initLogin(onError: (message: string) => void) {
     const data = new FormData(form)
     if (submit) submit.disabled = true
     try {
-      await signIn(String(data.get('email') ?? ''), String(data.get('password') ?? ''))
+      const user = await signIn(String(data.get('email') ?? ''), String(data.get('password') ?? ''))
       $('#authError')!.hidden = true
-      await start()
+      // On enchaîne sur la session renvoyée par la connexion plutôt que de la relire.
+      await start(user)
     } catch (error) {
       showAuthScreen((error as Error).message)
     } finally {
@@ -97,15 +98,25 @@ type GateOptions = {
 
 let options: GateOptions
 
-async function start() {
+async function start(known?: SessionUser) {
   if (starting) return
   starting = true
   try {
     let loaded: Profile | null
-    try { loaded = await currentProfile() }
+    try { loaded = await currentProfile(known) }
     catch (error) { showAuthScreen((error as Error).message); return }
 
-    if (!loaded) { showAuthScreen(''); return }
+    if (!loaded) {
+      // Aucune session au démarrage : écran de connexion normal. Après une
+      // connexion acceptée, c'est que le navigateur ne conserve pas la session.
+      if (known) {
+        clearStoredSession()
+        showAuthScreen('Connexion acceptée mais la session n’a pas pu être conservée. Autorise le stockage local pour ce site (navigation privée, blocage des cookies ou extension de confidentialité), puis réessaie.')
+      } else {
+        showAuthScreen('')
+      }
+      return
+    }
 
     profile = loaded
     showApp()
@@ -119,5 +130,7 @@ export async function bootAuth(gateOptions: GateOptions) {
   initLogin((message) => gateOptions.notify(message))
   initAccountMenu(gateOptions.notify)
   onAuthChange(() => void start())
+  // Diagnostic visible dans la console du navigateur en cas de souci de session.
+  console.info('[nira-audit] écran de connexion prêt')
   await start()
 }

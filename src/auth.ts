@@ -26,16 +26,17 @@ let fallbackToken: string | null = null
 
 let scoped: { token: string; client: SupabaseClient } | null = null
 
-/** Client authentifié avec le jeton en mémoire, à défaut le client à session persistée. */
-function authedClient() {
-  if (!fallbackToken) return supabase
-  if (scoped?.token !== fallbackToken) {
+/** Client authentifié explicitement avec le jeton gardé en mémoire. */
+function scopedClient(): SupabaseClient {
+  const token = fallbackToken
+  if (!token) return supabase
+  if (scoped?.token !== token) {
     scoped = {
-      token: fallbackToken,
+      token,
       client: createClient(supabaseUrl, supabaseAnonKey, {
         // Clé de stockage distincte : ce client ne partage pas la session du client principal.
         auth: { autoRefreshToken: false, persistSession: false, storageKey: 'nira-audit-scoped' },
-        global: { headers: { Authorization: `Bearer ${fallbackToken}` } },
+        global: { headers: { Authorization: `Bearer ${token}` } },
       }),
     }
   }
@@ -59,7 +60,13 @@ export async function currentProfile(known?: SessionUser): Promise<Profile | nul
   }
   if (!user) return null
 
-  const { data, error } = await authedClient().from('profiles').select('*').eq('id', user.id).maybeSingle()
+  // Chemin normal : le client à session persistée. S'il ne rend rien alors qu'une
+  // session vient d'être obtenue, c'est que le navigateur ne la conserve pas ;
+  // on relit alors le profil avec le jeton gardé en mémoire.
+  let { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
+  if ((error || !data) && fallbackToken) {
+    ({ data, error } = await scopedClient().from('profiles').select('*').eq('id', user.id).maybeSingle())
+  }
   if (error) throw new Error(`Profil illisible (${error.code ?? 'erreur'}) : ${error.message}`)
   if (!data) {
     throw new Error(`Aucun profil n’est associé à ${user.email}. Exécute supabase/relay-auth.sql dans Supabase.`)

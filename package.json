@@ -8,11 +8,13 @@
     "dev:client": "vite --host 127.0.0.1",
     "dev:server": "tsx watch server/index.ts",
     "build": "tsc --noEmit && vite build",
-    "start": "tsx server/index.ts"
+    "start": "tsx server/index.ts",
+    "migrate:supabase": "tsx scripts/migrate-to-supabase.ts"
   },
   "dependencies": {
     "@slack/web-api": "^8.0.0",
     "@supabase/supabase-js": "^2.112.3",
+    "@vercel/functions": "^3.9.5",
     "cors": "^2.8.5",
     "dotenv": "^17.4.2",
     "express": "^5.1.0",

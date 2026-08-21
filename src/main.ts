@@ -55,7 +55,8 @@ type ContextDocument = { id: string; name: string; mimeType: string; size: numbe
 const $ = <T extends HTMLElement = HTMLElement>(selector: string) => document.querySelector<T>(selector)
 const $$ = <T extends HTMLElement = HTMLElement>(selector: string) => Array.from(document.querySelectorAll<T>(selector))
 const escapeHtml = (value: string) => value.replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character] ?? character))
-const documentUrl = (value: string) => value.startsWith('/') ? `http://127.0.0.1:3001${value}` : value
+// Les liens sont relatifs depuis le port au port ; les anciennes actions enregistrées portent encore l'URL absolue du serveur local.
+const documentUrl = (value: string) => value.replace('http://127.0.0.1:3001', '')
 const documentOpenUrl = (action: AssistantAction) => documentUrl(action.openUrl || (action.viewUrl || action.downloadUrl || '').replace(/\/view$/, '/open'))
 const formatDate = (value: string) => value ? new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${value}T12:00:00`)) : 'Date non renseignée'
 const launchStartedAt = performance.now()

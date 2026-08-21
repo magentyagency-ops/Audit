@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
+import { readProjectState, readRegistryRaw, removeProjectStorage, storageMode, writeProjectState, writeRegistryRaw } from './storage.js'
 
 export const ProjectBriefSchema = z.object({
   name: z.string(),
@@ -63,17 +64,12 @@ export function projectStateFile(id: string) {
 }
 
 export async function readRegistry(): Promise<ProjectRegistry> {
-  try {
-    const parsed = JSON.parse(await fs.readFile(registryFile, 'utf8')) as Partial<ProjectRegistry>
-    return { projects: Array.isArray(parsed.projects) ? parsed.projects.map(normalizeProject) : [] }
-  } catch { return { projects: [] } }
+  const parsed = await readRegistryRaw<Partial<ProjectRegistry>>({ projects: [] })
+  return { projects: Array.isArray(parsed.projects) ? parsed.projects.map(normalizeProject) : [] }
 }
 
 async function saveRegistry(registry: ProjectRegistry) {
-  await fs.mkdir(dataRoot, { recursive: true })
-  const temp = `${registryFile}.tmp`
-  await fs.writeFile(temp, JSON.stringify(registry, null, 2), 'utf8')
-  await fs.rename(temp, registryFile)
+  await writeRegistryRaw(registry)
 }
 
 function normalizeProject(value: Partial<Project>): Project {
@@ -108,7 +104,6 @@ export async function insertProject(draft: Partial<Project>) {
   const project = normalizeProject({ ...draft, id: draft.id || randomUUID(), accent: draft.accent || accentPalette[registry.projects.length % accentPalette.length] })
   registry.projects.unshift(project)
   await saveRegistry(registry)
-  await fs.mkdir(path.dirname(projectStateFile(project.id)), { recursive: true })
   return project
 }
 
@@ -128,19 +123,19 @@ export async function removeProject(id: string) {
   if (!project) throw Object.assign(new Error('Projet introuvable.'), { status: 404 })
   registry.projects = registry.projects.filter((item) => item.id !== id)
   await saveRegistry(registry)
-  await fs.rm(path.join(projectsRoot, id), { recursive: true, force: true })
+  await removeProjectStorage(id)
   return project
 }
 
 export async function projectStats(id: string) {
   try {
-    const parsed = JSON.parse(await fs.readFile(projectStateFile(id), 'utf8')) as {
+    const parsed = (await readProjectState<{
       interviews?: Array<{ status?: string }>
       mapNodes?: unknown[]
       missionActions?: Array<{ done?: boolean }>
       contextDocuments?: unknown[]
       updatedAt?: string
-    }
+    }>(id)) ?? {}
     const interviews = Array.isArray(parsed.interviews) ? parsed.interviews : []
     const actions = Array.isArray(parsed.missionActions) ? parsed.missionActions : []
     return {
@@ -160,6 +155,7 @@ export async function projectStats(id: string) {
 export async function bootstrapProjects() {
   const registry = await readRegistry()
   if (registry.projects.length) return registry.projects
+  if (storageMode !== 'local') return []
   const hasLegacyState = await fs.access(legacyStateFile).then(() => true).catch(() => false)
   if (!hasLegacyState) return []
   const project = await insertProject({
@@ -183,8 +179,7 @@ export async function bootstrapProjects() {
       firstSteps: [],
     },
   })
-  await fs.mkdir(path.dirname(projectStateFile(project.id)), { recursive: true })
-  await fs.copyFile(legacyStateFile, projectStateFile(project.id))
+  await writeProjectState(project.id, JSON.parse(await fs.readFile(legacyStateFile, 'utf8')))
   await fs.rename(legacyStateFile, `${legacyStateFile}.pre-multiprojet.bak`).catch(() => undefined)
   console.log(`Migration : les données existantes ont été rattachées au projet « ${project.name} ».`)
   return [project]

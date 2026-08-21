@@ -13,6 +13,8 @@ import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { authConfigured, currentUser, requireSession } from './auth.js'
+import { getFile, putFile, readJob, removeFile, readProjectState, storageMode, writeJob, writeProjectState, type StoredJob } from './storage.js'
+import { waitUntil } from '@vercel/functions'
 import { handleAdminUsers } from './adminUsers.js'
 import { ProjectBriefSchema, activeProject, bootstrapProjects, findProject, insertProject, listProjects, patchProject, projectStateFile, projectStats, removeProject, withProject, type Project, type ProjectBrief } from './projects.js'
 
@@ -211,8 +213,10 @@ const emptyState = (): MissionState => ({
 })
 
 let peopleDirectory: DirectoryPerson[] | null = null
-type AuditReportJob = { status: 'processing' | 'complete' | 'error'; createdAt: number; result?: Awaited<ReturnType<typeof generateAuditReport>>; error?: string }
-const auditReportJobs = new Map<string, AuditReportJob>()
+/** Prolonge le travail au-delà de la réponse : `waitUntil` en serverless, simple promesse en local. */
+function runInBackground(work: Promise<unknown>) {
+  try { waitUntil(work) } catch { void work }
+}
 
 async function readPeopleDirectory() {
   if (peopleDirectory) return peopleDirectory
@@ -265,18 +269,14 @@ function normalizeState(value: Partial<MissionState>): MissionState {
 }
 
 async function readState(): Promise<MissionState> {
-  const file = stateFile()
-  try { return normalizeState(JSON.parse(await fs.readFile(file, 'utf8')) as Partial<MissionState>) }
-  catch { const fresh = emptyState(); await saveState(fresh); return fresh }
+  const stored = await readProjectState<Partial<MissionState>>(activeProject().id)
+  if (!stored) { const fresh = emptyState(); await saveState(fresh); return fresh }
+  return normalizeState(stored)
 }
 
 async function saveState(next: MissionState) {
-  const file = stateFile()
   next.updatedAt = new Date().toISOString()
-  await fs.mkdir(path.dirname(file), { recursive: true })
-  const temp = `${file}.tmp`
-  await fs.writeFile(temp, JSON.stringify(next, null, 2), 'utf8')
-  await fs.rename(temp, file)
+  await writeProjectState(activeProject().id, next)
 }
 
 /** Every AI prompt is grounded in the brief of the selected project so each mission stays in its own context. */
@@ -535,7 +535,7 @@ async function contextVisionContent(current: MissionState, text: string, attachm
   const visualDocuments = current.contextDocuments.filter((document) => document.mimeType.startsWith('image/') || !document.mimeType.startsWith('text/')).slice(-5)
   for (const document of visualDocuments) {
     try {
-      const bytes = await fs.readFile(document.filePath)
+      const bytes = await getFile(document.filePath)
       if (bytes.byteLength <= 4 * 1024 * 1024) {
         if (document.mimeType.startsWith('image/')) content.push({ type: 'input_image', image_url: `data:${document.mimeType};base64,${bytes.toString('base64')}`, detail: 'low' })
         else content.push({ type: 'input_file', filename: document.name, file_data: `data:${document.mimeType};base64,${bytes.toString('base64')}` })
@@ -584,10 +584,9 @@ async function generateMissionDocument(current: MissionState, action: Extract<As
   if (!html.toLowerCase().startsWith('<!doctype html')) throw new Error('Le document généré est incomplet. Réessaie.')
   const safeTitle = action.title.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').slice(0, 60) || 'document'
   const filename = `${safeTitle}-${Date.now()}.html`
-  await fs.mkdir(documentDirectory, { recursive: true })
-  await fs.writeFile(path.join(documentDirectory, filename), html, 'utf8')
+  await putFile(`documents/${filename}`, html, 'text/html; charset=utf-8')
   const encoded = encodeURIComponent(filename)
-  return { title: action.title, filename, downloadUrl: `http://127.0.0.1:3001/api/documents/${encoded}`, viewUrl: `http://127.0.0.1:3001/api/documents/${encoded}/view`, openUrl: `http://127.0.0.1:3001/api/documents/${encoded}/open` }
+  return { title: action.title, filename, downloadUrl: `/api/documents/${encoded}`, viewUrl: `/api/documents/${encoded}/view`, openUrl: `/api/documents/${encoded}/open` }
 }
 
 async function generateAuditReport(current: MissionState) {
@@ -610,10 +609,9 @@ async function generateAuditReport(current: MissionState) {
   if (!html.toLowerCase().startsWith('<!doctype html')) throw new Error('Le rapport d’audit généré est incomplet. Réessaie.')
   const projectSlug = activeProject().name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').slice(0, 40) || 'projet'
   const filename = `Rapport-audit-${projectSlug}-${Date.now()}.html`
-  await fs.mkdir(documentDirectory, { recursive: true })
-  await fs.writeFile(path.join(documentDirectory, filename), html, 'utf8')
+  await putFile(`documents/${filename}`, html, 'text/html; charset=utf-8')
   const encoded = encodeURIComponent(filename)
-  return { title: `Rapport d’audit — ${activeProject().name}`, filename, downloadUrl: `http://127.0.0.1:3001/api/documents/${encoded}`, viewUrl: `http://127.0.0.1:3001/api/documents/${encoded}/view`, openUrl: `http://127.0.0.1:3001/api/documents/${encoded}/open`, model: auditReportModel }
+  return { title: `Rapport d’audit — ${activeProject().name}`, filename, downloadUrl: `/api/documents/${encoded}`, viewUrl: `/api/documents/${encoded}/view`, openUrl: `/api/documents/${encoded}/open`, model: auditReportModel }
 }
 
 function assistantCalendarPayload(event: Extract<AssistantAction, { type: 'create_calendar_event' }>['event']) {
@@ -734,7 +732,7 @@ app.use('/api', (req, res, next) => {
   }).catch(next)
 })
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, openaiConfigured: Boolean(openai), authConfigured: authConfigured(), model }))
+app.get('/api/health', (_req, res) => res.json({ ok: true, openaiConfigured: Boolean(openai), authConfigured: authConfigured(), storage: storageMode, model }))
 
 app.get('/api/projects', async (_req, res, next) => {
   try {
@@ -1117,8 +1115,7 @@ app.post('/api/context-documents', contextUpload.single('file'), async (req: Req
     if (!req.file) return res.status(400).json({ error: 'Ajoute un document, une image ou un tableau.' })
     const current = await readState(); const now = new Date().toISOString(); const id = randomUUID()
     const safeName = req.file.originalname.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9._-]+/gi, '-').slice(0, 140) || 'document'
-    const filePath = path.join(contextDocumentDirectory, `${id}-${safeName}`)
-    await fs.mkdir(contextDocumentDirectory, { recursive: true }); await fs.writeFile(filePath, req.file.buffer)
+    const filePath = await putFile(`context/${id}-${safeName}`, req.file.buffer, req.file.mimetype || 'application/octet-stream')
     const extension = path.extname(safeName).toLowerCase(); const textLike = req.file.mimetype.startsWith('text/') || ['.md', '.txt', '.csv', '.json', '.xml', '.html'].includes(extension)
     const extractedText = textLike ? req.file.buffer.toString('utf8').slice(0, 200_000) : ''
     const document: ContextDocument = { id, name: req.file.originalname.slice(0, 180), mimeType: req.file.mimetype || 'application/octet-stream', size: req.file.size, filePath, extractedText, createdAt: now }
@@ -1131,7 +1128,7 @@ app.delete('/api/context-documents/:id', async (req, res, next) => {
   try {
     const current = await readState(); const document = current.contextDocuments.find((item) => item.id === req.params.id)
     if (!document) return res.status(404).json({ error: 'Document introuvable.' })
-    current.contextDocuments = current.contextDocuments.filter((item) => item.id !== document.id); await saveState(current); await fs.rm(document.filePath, { force: true }); res.json({ deleted: document.id })
+    current.contextDocuments = current.contextDocuments.filter((item) => item.id !== document.id); await saveState(current); await removeFile(document.filePath); res.json({ deleted: document.id })
   } catch (error) { next(error) }
 })
 
@@ -1156,62 +1153,60 @@ app.get('/api/assistant/conversations/:id', async (req, res) => {
   res.json(conversation)
 })
 
-app.post('/api/audit-report', (_req, res) => {
-  const jobId = randomUUID()
-  const job: AuditReportJob = { status: 'processing', createdAt: Date.now() }
-  auditReportJobs.set(jobId, job)
-  const project = activeProject()
-  void withProject(project, async () => {
-    try {
-      job.result = await generateAuditReport(await readState())
-      job.status = 'complete'
-    } catch (error) {
-      job.status = 'error'
-      job.error = error instanceof Error ? error.message : 'La génération du rapport a échoué.'
-    }
-  })
-  res.status(202).json({ jobId, status: job.status })
+app.post('/api/audit-report', async (_req, res, next) => {
+  try {
+    const jobId = randomUUID()
+    const job: StoredJob = { id: jobId, status: 'processing', createdAt: new Date().toISOString() }
+    await writeJob(job)
+    const project = activeProject()
+    runInBackground(withProject(project, async () => {
+      try { await writeJob({ ...job, status: 'complete', result: await generateAuditReport(await readState()) }) }
+      catch (error) { await writeJob({ ...job, status: 'error', error: error instanceof Error ? error.message : 'La génération du rapport a échoué.' }) }
+    }))
+    res.status(202).json({ jobId, status: job.status })
+  } catch (error) { next(error) }
 })
 
-app.get('/api/audit-report/:jobId', (req, res) => {
-  const job = auditReportJobs.get(req.params.jobId)
-  if (!job) return res.status(404).json({ error: 'La génération du rapport a expiré. Relance-la.' })
-  if (Date.now() - job.createdAt > 30 * 60_000) { auditReportJobs.delete(req.params.jobId); return res.status(404).json({ error: 'La génération du rapport a expiré. Relance-la.' }) }
-  res.json({ status: job.status, result: job.result, error: job.error })
+app.get('/api/audit-report/:jobId', async (req, res, next) => {
+  try {
+    const job = await readJob(req.params.jobId)
+    const expired = job && Date.now() - new Date(job.createdAt).getTime() > 30 * 60_000
+    if (!job || expired) return res.status(404).json({ error: 'La génération du rapport a expiré. Relance-la.' })
+    res.json({ status: job.status, result: job.result, error: job.error })
+  } catch (error) { next(error) }
 })
+
+async function readGeneratedDocument(name: string) {
+  const filename = path.basename(name)
+  if (!filename.endsWith('.html')) throw Object.assign(new Error('Document introuvable.'), { status: 404 })
+  try { return { filename, html: (await getFile(`documents/${filename}`)).toString('utf8') } }
+  catch { throw Object.assign(new Error('Document introuvable.'), { status: 404 }) }
+}
 
 app.get('/api/documents/:filename', async (req, res, next) => {
   try {
-    const filename = path.basename(req.params.filename)
-    if (!filename.endsWith('.html')) return res.status(404).end()
-    const file = path.join(documentDirectory, filename)
-    await fs.access(file)
-    res.download(file, filename)
-  } catch (error) { next(Object.assign(new Error('Document introuvable.'), { status: 404 })) }
+    const { filename, html } = await readGeneratedDocument(req.params.filename)
+    res.type('html').setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+    res.send(html)
+  } catch (error) { next(error) }
 })
 
 app.get('/api/documents/:filename/view', async (req, res, next) => {
-  try {
-    const filename = path.basename(req.params.filename)
-    if (!filename.endsWith('.html')) return res.status(404).end()
-    const file = path.join(documentDirectory, filename)
-    await fs.access(file)
-    res.sendFile(file)
-  } catch (error) { next(Object.assign(new Error('Document introuvable.'), { status: 404 })) }
+  try { res.type('html').send((await readGeneratedDocument(req.params.filename)).html) }
+  catch (error) { next(error) }
 })
 
 app.get('/api/documents/:filename/open', async (req, res, next) => {
   try {
-    const filename = path.basename(req.params.filename)
-    if (!filename.endsWith('.html')) return res.status(404).end()
-    const file = path.join(documentDirectory, filename)
-    await fs.access(file)
+    const { filename, html } = await readGeneratedDocument(req.params.filename)
+    // En ligne, « ouvrir » revient à afficher le document : rien n'est écrit sur le disque du serveur.
+    if (storageMode !== 'local') return res.type('html').send(html)
     const downloadedFile = path.join(downloadsDirectory, filename)
     await fs.mkdir(downloadsDirectory, { recursive: true })
-    await fs.copyFile(file, downloadedFile)
+    await fs.writeFile(downloadedFile, html, 'utf8')
     spawn('open', [downloadedFile], { detached: true, stdio: 'ignore' }).unref()
     res.type('html').send('<!doctype html><meta charset="utf-8"><title>Document ouvert</title><p>Le document a été enregistré dans Téléchargements et ouvert dans votre navigateur par défaut.</p>')
-  } catch (error) { next(Object.assign(new Error('Impossible d’ouvrir le document.'), { status: 500 })) }
+  } catch (error) { next(error) }
 })
 
 app.post('/api/assistant/chat', assistantAttachmentUpload.single('attachment'), async (req, res, next) => {
@@ -1365,7 +1360,7 @@ app.use((error: Error & { status?: number; statusCode?: number; code?: string; t
   res.status(status).json({ error: apiMessage || 'Une erreur est survenue.' })
 })
 
-const bootstrapped = await bootstrapProjects()
+const bootstrapped = storageMode === 'local' ? await bootstrapProjects() : []
 for (const project of bootstrapped) {
   if (project.id !== 'perfectserve') continue
   await withProject(project, async () => {
@@ -1377,4 +1372,9 @@ for (const project of bootstrapped) {
   })
 }
 
-app.listen(3001, '127.0.0.1', () => console.log(`Relay API listening on http://127.0.0.1:3001 · OpenAI ${openai ? 'ready' : 'not configured'} · Auth ${authConfigured() ? 'ready' : 'not configured'} · ${model}`))
+// En local le serveur écoute ; en serverless, api/index.ts réutilise l'application telle quelle.
+if (!process.env.VERCEL) {
+  app.listen(3001, '127.0.0.1', () => console.log(`Relay API listening on http://127.0.0.1:3001 · OpenAI ${openai ? 'ready' : 'not configured'} · Auth ${authConfigured() ? 'ready' : 'not configured'} · Stockage ${storageMode} · ${model}`))
+}
+
+export default app

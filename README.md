@@ -41,50 +41,49 @@ SUPABASE_SERVICE_ROLE_KEY=votre-service-role-key   # administration des comptes 
 
 ## Déploiement Vercel
 
-`vercel.json` et la fonction `api/admin/users.ts` sont prêts : le build produit `dist/` et l'administration des comptes tourne en serverless avec la clé `service_role`.
+L'application tourne en ligne avec l'API de mission en fonction serverless et les données dans Supabase.
 
-⚠️ Avant de déployer, les données de mission doivent quitter le disque local : le serveur Express (`server/index.ts`) écrit dans `data/projects/<id>/mission-control.json`, or le système de fichiers de Vercel est éphémère et l'API locale n'y tourne pas. Il reste donc à porter l'état des projets vers Supabase (ou un stockage distant) et à convertir les routes Express en fonctions serverless.
+### 1. Base de données
 
-## Configuration OpenAI
+Exécuter dans l'éditeur SQL de Supabase, dans cet ordre :
 
-Créer un fichier `.env.local` à la racine à partir de `.env.example`, puis renseigner :
-
-```bash
-OPENAI_API_KEY=your_api_key
-OPENAI_MODEL=gpt-5.6-luna
+```
+supabase/relay-auth.sql   → comptes, rôles, RLS
+supabase/relay-data.sql   → tables des missions (relay_projects, relay_project_state, relay_jobs)
 ```
 
-Le fichier `.env.local` est exclu de Git. La clé n’est jamais exposée au navigateur : seul le serveur local l’utilise.
+Le bucket de stockage `relay-files` (documents générés et fichiers de contexte) est créé automatiquement au premier usage.
 
-## Connexion Slack
+### 2. Migration des missions existantes
 
-Créer une Slack App, l’installer dans le workspace et ajouter son token bot dans `.env.local` :
-
-```bash
-SLACK_BOT_TOKEN=xoxb-your-bot-token
-```
-
-Pour recevoir uniquement les messages privés envoyés directement au bot, donner les scopes minimums `im:read`, `im:history` et `users:read`. Le bot ne peut pas lire les messages directs échangés entre deux autres personnes, ni les canaux Slack.
-
-L’application détecte automatiquement le token dès qu’il est enregistré dans `.env.local`.
-
-## Fonctionnalités
-
-- Authentification Supabase, rôles administrateur / consultant et gestion des comptes de l'équipe.
-- Tableau de bord multi-projets : création, sélection et suppression des missions.
-- Contexte de projet généré par l’IA à partir d’une description en quelques phrases.
-- Notes sauvegardées automatiquement.
-- Thème mémorisé.
-- Import de transcriptions `.txt` et `.md` ou collage direct.
-- Synthèse détaillée et structurée des entretiens avec OpenAI.
-- Résumé projet cumulatif : chaque nouvel entretien met à jour le résumé précédent.
-- Suivi des entretiens persistant.
-- Cartographie entièrement éditable : ajout, modification et suppression des phases et étapes.
-- Statuts de cartographie : `confirmé`, `à vérifier` et `friction`.
-- Espace Slack : lecture des messages directs envoyés au bot et synchronisation automatique.
-
-## Vérifier la version de production
+Renseigner `SUPABASE_SERVICE_ROLE_KEY` dans `.env.local`, puis :
 
 ```bash
-npm run build
+npm run migrate:supabase
 ```
+
+Le script pousse `data/projects.json`, l'état de chaque mission et les fichiers associés vers Supabase. Il est réexécutable sans créer de doublon.
+
+### 3. Variables d'environnement Vercel
+
+```
+VITE_SUPABASE_URL
+VITE_SUPABASE_ANON_KEY
+SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY
+OPENAI_API_KEY
+OPENAI_MODEL
+SLACK_BOT_TOKEN            (facultatif)
+OUTLOOK_CLIENT_ID / OUTLOOK_CLIENT_SECRET / OUTLOOK_TENANT_ID / OUTLOOK_REDIRECT_URI  (facultatif)
+```
+
+### Stockage : local ou Supabase
+
+`server/storage.ts` expose la même interface au-dessus de deux implémentations. Le mode est choisi par `RELAY_STORAGE` (`local` ou `supabase`) ; sans cette variable, c'est Supabase dès qu'une clé `service_role` est présente, sinon le disque. `GET /api/health` indique le mode actif.
+
+En pratique : sur Vercel, toujours Supabase ; en local, `RELAY_STORAGE=local` pour continuer à travailler sur `data/` même avec la clé renseignée.
+
+### Limites connues en ligne
+
+- Vercel plafonne le corps d'une requête serverless à environ 4,5 Mo : les transcriptions et documents de contexte plus lourds passent en local mais sont refusés en ligne.
+- « Ouvrir » un document généré l'affiche dans le navigateur au lieu de l'enregistrer dans Téléchargements, le serveur n'ayant pas de disque.

@@ -7,6 +7,10 @@
   <style>
     @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@500;600;700;800&display=swap');
     *{box-sizing:border-box}
+
+    /* L'attribut hidden doit l'emporter sur les display des classes (.btn, .auth-screen…) :
+       sans cette règle, un élément masqué en JS reste affiché. */
+    [hidden]{display:none!important}
     body{max-width:820px;margin:0 auto;padding:28px 18px 70px;background:#f8fcff;color:#102a43;font:13px/1.6 Manrope,Arial,sans-serif}
     h1{margin:0 0 6px;font-size:26px;letter-spacing:-.05em}
     p.intro{margin:0 0 22px;color:#627d98;font-size:12px}

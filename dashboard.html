@@ -13,6 +13,10 @@
     body[data-theme="ocean"]{--ink:#073044;--muted:#557b89;--blue:#0077db;--blue-2:#30b0c7;--cyan:#00a8c6;--green:#139c87;--glass:rgba(244,254,255,.78);--surface:rgba(239,253,254,.66);--field:rgba(247,254,255,.94)}
     body[data-theme="sunset"]{--ink:#3b2b19;--muted:#826d51;--blue:#d57700;--blue-2:#ffb340;--cyan:#32ade6;--green:#398f69;--glass:rgba(255,251,244,.8);--surface:rgba(255,249,237,.68);--field:rgba(255,252,247,.95)}
     *{box-sizing:border-box}
+
+    /* L'attribut hidden doit l'emporter sur les display des classes (.btn, .auth-screen…) :
+       sans cette règle, un élément masqué en JS reste affiché. */
+    [hidden]{display:none!important}
     body{min-height:100vh;margin:0;background:linear-gradient(145deg,#f8fcff,#fff 48%,#f2f9ff);color:var(--ink);font:13px/1.55 Manrope,Arial,sans-serif;transition:color .35s,background .6s}
     body[data-theme="midnight"]{background:linear-gradient(145deg,#101827,#17253a 48%,#102f35)}
     body[data-theme="ocean"]{background:linear-gradient(145deg,#f3fdff,#fff 48%,#eaf9ff)}

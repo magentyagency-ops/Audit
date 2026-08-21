@@ -45,17 +45,26 @@ function initLogin(onError: (message: string) => void) {
   form.addEventListener('submit', async (event) => {
     event.preventDefault()
     const submit = form.querySelector<HTMLButtonElement>('button[type="submit"]')
-    const data = new FormData(form)
-    if (submit) submit.disabled = true
+    const label = submit?.innerHTML ?? ''
+    const email = $<HTMLInputElement>('#loginEmail')!.value.trim()
+    const password = $<HTMLInputElement>('#loginPassword')!.value
+
+    // La validation est faite ici plutôt que par le navigateur : sa bulle native
+    // bloquait l'envoi sans rien afficher d'exploitable.
+    if (!email || !email.includes('@')) return showAuthScreen('Saisis ton adresse email complète.')
+    if (!password) return showAuthScreen('Saisis ton mot de passe.')
+
+    if (submit) { submit.disabled = true; submit.innerHTML = '<span class="spinner"></span>Connexion…' }
     try {
-      const user = await signIn(String(data.get('email') ?? ''), String(data.get('password') ?? ''))
+      const user = await signIn(email, password)
       $('#authError')!.hidden = true
       // On enchaîne sur la session renvoyée par la connexion plutôt que de la relire.
       await start(user)
     } catch (error) {
-      showAuthScreen((error as Error).message)
+      console.error('[nira-audit] connexion refusée', error)
+      showAuthScreen((error as Error).message || 'Connexion impossible.')
     } finally {
-      if (submit) submit.disabled = false
+      if (submit) { submit.disabled = false; submit.innerHTML = label }
     }
   })
 
@@ -130,7 +139,8 @@ export async function bootAuth(gateOptions: GateOptions) {
   initLogin((message) => gateOptions.notify(message))
   initAccountMenu(gateOptions.notify)
   onAuthChange(() => void start())
-  // Diagnostic visible dans la console du navigateur en cas de souci de session.
+  // Signale au filet de sécurité de la page que le module est bien en place.
+  ;(window as unknown as { __niraBooted?: boolean }).__niraBooted = true
   console.info('[nira-audit] écran de connexion prêt')
   await start()
 }

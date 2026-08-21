@@ -129,9 +129,9 @@
       <div class="auth-brand"><i class="ri-radar-line"></i><div><b>Nira Audit</b><span>Mission Control</span></div></div>
       <h1>Connexion</h1>
       <p class="auth-intro">Accède aux missions de l’équipe. Les comptes sont créés par un administrateur.</p>
-      <form id="loginForm">
-        <div class="field-group"><label for="loginEmail">Email</label><input class="field" id="loginEmail" name="email" type="email" autocomplete="email" required placeholder="prenom@nira-ia.com"></div>
-        <div class="field-group"><label for="loginPassword">Mot de passe</label><input class="field" id="loginPassword" name="password" type="password" autocomplete="current-password" required placeholder="••••••••"></div>
+      <form id="loginForm" novalidate>
+        <div class="field-group"><label for="loginEmail">Email</label><input class="field" id="loginEmail" name="email" type="email" autocomplete="email" placeholder="prenom@nira-ia.com"></div>
+        <div class="field-group"><label for="loginPassword">Mot de passe</label><input class="field" id="loginPassword" name="password" type="password" autocomplete="current-password" placeholder="••••••••"></div>
         <p class="auth-error" id="authError" hidden></p>
         <button class="btn primary auth-submit" type="submit"><i class="ri-login-circle-line"></i>Se connecter</button>
       </form>
@@ -232,6 +232,26 @@
   <dialog id="passwordDialog"><form class="modal glass" id="passwordForm" style="width:min(430px,calc(100vw - 34px))"><div class="modal-head"><div><h2>Changer mon mot de passe</h2><p>Il remplace immédiatement l’ancien.</p></div><button type="button" class="icon-btn" data-close="passwordDialog"><i class="ri-close-line"></i></button></div><div class="field-group"><label for="newPassword">Nouveau mot de passe</label><input class="field" id="newPassword" type="password" required minlength="8" placeholder="8 caractères minimum"></div><div class="modal-actions"><button class="btn" type="button" data-close="passwordDialog">Annuler</button><button class="btn primary" type="submit"><i class="ri-check-line"></i>Enregistrer</button></div></form></dialog>
   <div class="toast" id="toast" role="status"></div>
   <datalist id="peopleSuggestions"></datalist>
+  <script>
+    // Filet de sécurité : si le module de l'application ne s'est pas chargé
+    // (cache, extension, coupure réseau), le clic sur « Se connecter » ne
+    // déclencherait rien de visible. On l'explique au lieu de rester muet.
+    window.__niraBooted = false;
+    document.addEventListener('DOMContentLoaded', function () {
+      var form = document.getElementById('loginForm');
+      var error = document.getElementById('authError');
+      function fail(message) { if (error) { error.hidden = false; error.textContent = message; } }
+      if (form) form.addEventListener('submit', function (event) {
+        if (!window.__niraBooted) {
+          event.preventDefault();
+          fail("Le script de l'application ne s'est pas chargé. Recharge la page avec Cmd+Shift+R, ou essaie en navigation privée.");
+        }
+      });
+      setTimeout(function () {
+        if (!window.__niraBooted) fail("Le script de l'application ne s'est pas chargé. Recharge la page avec Cmd+Shift+R, ou essaie en navigation privée.");
+      }, 5000);
+    });
+  </script>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

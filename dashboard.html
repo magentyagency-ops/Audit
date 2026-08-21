@@ -138,9 +138,9 @@
       <div class="auth-brand"><i class="ri-radar-line"></i><div><b>Nira Audit</b><span>Mission Control</span></div></div>
       <h1>Connexion</h1>
       <p class="auth-intro">Accède aux missions de l’équipe. Les comptes sont créés par un administrateur.</p>
-      <form id="loginForm">
-        <div class="field-group"><label for="loginEmail">Email</label><input class="field" id="loginEmail" name="email" type="email" autocomplete="email" required placeholder="prenom@nira-ia.com"></div>
-        <div class="field-group"><label for="loginPassword">Mot de passe</label><input class="field" id="loginPassword" name="password" type="password" autocomplete="current-password" required placeholder="••••••••"></div>
+      <form id="loginForm" novalidate>
+        <div class="field-group"><label for="loginEmail">Email</label><input class="field" id="loginEmail" name="email" type="email" autocomplete="email" placeholder="prenom@nira-ia.com"></div>
+        <div class="field-group"><label for="loginPassword">Mot de passe</label><input class="field" id="loginPassword" name="password" type="password" autocomplete="current-password" placeholder="••••••••"></div>
         <p class="auth-error" id="authError" hidden></p>
         <button class="btn primary auth-submit" type="submit"><i class="ri-login-circle-line"></i>Se connecter</button>
       </form>
@@ -237,6 +237,26 @@
   </dialog>
 
   <div class="toast" id="toast"></div>
+  <script>
+    // Filet de sécurité : si le module de l'application ne s'est pas chargé
+    // (cache, extension, coupure réseau), le clic sur « Se connecter » ne
+    // déclencherait rien de visible. On l'explique au lieu de rester muet.
+    window.__niraBooted = false;
+    document.addEventListener('DOMContentLoaded', function () {
+      var form = document.getElementById('loginForm');
+      var error = document.getElementById('authError');
+      function fail(message) { if (error) { error.hidden = false; error.textContent = message; } }
+      if (form) form.addEventListener('submit', function (event) {
+        if (!window.__niraBooted) {
+          event.preventDefault();
+          fail("Le script de l'application ne s'est pas chargé. Recharge la page avec Cmd+Shift+R, ou essaie en navigation privée.");
+        }
+      });
+      setTimeout(function () {
+        if (!window.__niraBooted) fail("Le script de l'application ne s'est pas chargé. Recharge la page avec Cmd+Shift+R, ou essaie en navigation privée.");
+      }, 5000);
+    });
+  </script>
   <script type="module" src="/src/dashboard.ts"></script>
 </body>
 </html>

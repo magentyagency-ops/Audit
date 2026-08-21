@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { supabase, supabaseAnonKey, supabaseUrl } from './supabase.js'
 
 export type Role = 'admin' | 'user'
@@ -24,14 +24,22 @@ export type SessionUser = { id: string; email?: string }
  */
 let fallbackToken: string | null = null
 
+let scoped: { token: string; client: SupabaseClient } | null = null
+
 /** Client authentifié avec le jeton en mémoire, à défaut le client à session persistée. */
 function authedClient() {
   if (!fallbackToken) return supabase
-  return createClient(supabaseUrl, supabaseAnonKey, {
-    // Clé de stockage distincte : ce client ne partage pas la session du client principal.
-    auth: { autoRefreshToken: false, persistSession: false, storageKey: 'nira-audit-scoped' },
-    global: { headers: { Authorization: `Bearer ${fallbackToken}` } },
-  })
+  if (scoped?.token !== fallbackToken) {
+    scoped = {
+      token: fallbackToken,
+      client: createClient(supabaseUrl, supabaseAnonKey, {
+        // Clé de stockage distincte : ce client ne partage pas la session du client principal.
+        auth: { autoRefreshToken: false, persistSession: false, storageKey: 'nira-audit-scoped' },
+        global: { headers: { Authorization: `Bearer ${fallbackToken}` } },
+      }),
+    }
+  }
+  return scoped.client
 }
 
 /**
@@ -79,6 +87,7 @@ export function clearStoredSession() {
 
 export async function signOut(): Promise<void> {
   fallbackToken = null
+  scoped = null
   await supabase.auth.signOut()
 }
 

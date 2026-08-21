@@ -2,12 +2,13 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "functions": {
-    "api/**/*.ts": {
+    "api/index.ts": {
       "memory": 1024,
       "maxDuration": 300
     }
   },
   "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index?__path=$1" },
     { "source": "/", "destination": "/dashboard.html" }
   ]
 }

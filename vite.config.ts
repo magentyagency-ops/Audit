@@ -28,6 +28,7 @@ export default defineConfig({
       input: {
         dashboard: resolve(root, 'dashboard.html'),
         workspace: resolve(root, 'workspace.html'),
+        diagnostic: resolve(root, 'diagnostic.html'),
       },
     },
   },

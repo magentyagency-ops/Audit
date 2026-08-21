@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nira Audit — Diagnostic de connexion</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@500;600;700;800&display=swap');
+    *{box-sizing:border-box}
+    body{max-width:820px;margin:0 auto;padding:28px 18px 70px;background:#f8fcff;color:#102a43;font:13px/1.6 Manrope,Arial,sans-serif}
+    h1{margin:0 0 6px;font-size:26px;letter-spacing:-.05em}
+    p.intro{margin:0 0 22px;color:#627d98;font-size:12px}
+    form{display:grid;gap:10px;margin-bottom:22px;padding:18px;border:1px solid rgba(89,129,169,.18);border-radius:16px;background:#fff}
+    label{color:#627d98;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+    input{width:100%;padding:11px 12px;border:1px solid rgba(89,129,169,.2);border-radius:10px;font:inherit}
+    button{padding:12px;border:0;border-radius:10px;background:#006bdc;color:#fff;font:700 12px Manrope;cursor:pointer}
+    button.ghost{background:#eef6ff;color:#0b4f9e}
+    button:disabled{opacity:.6;cursor:wait}
+    .step{display:grid;grid-template-columns:26px 1fr;gap:10px;padding:12px 14px;margin-bottom:7px;border-radius:12px;background:#fff;border:1px solid rgba(89,129,169,.15)}
+    .step b{display:block;font-size:12px}
+    .step span{display:block;margin-top:3px;color:#627d98;font:500 11px/1.55 'DM Mono';word-break:break-word;white-space:pre-wrap}
+    .ok{color:#18a67e}.ko{color:#e84d6a}.wait{color:#e99512}
+    .mark{font-size:16px;text-align:center}
+    .step.fail{border-color:rgba(232,77,106,.4);background:#fff6f8}
+  </style>
+</head>
+<body>
+  <h1>Diagnostic de connexion</h1>
+  <p class="intro">Cette page déroule exactement les étapes que fait l’application, et affiche où ça casse. Rien n’est enregistré : les identifiants ne servent qu’à ce test, dans ton navigateur.</p>
+  <form id="form">
+    <div><label for="email">Email</label><input id="email" type="text" autocomplete="username" placeholder="prenom@nira-ia.com"></div>
+    <div><label for="password">Mot de passe</label><input id="password" type="password" autocomplete="current-password"></div>
+    <button type="submit" id="run">Lancer le diagnostic</button>
+    <button type="button" class="ghost" id="copy">Copier le rapport</button>
+  </form>
+  <div id="steps"></div>
+  <script type="module" src="/src/diagnostic.ts"></script>
+</body>
+</html>

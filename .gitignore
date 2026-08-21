@@ -1,0 +1,18 @@
+node_modules/
+dist/
+.env
+.env.local
+data/*.log
+data/*.tmp
+.DS_Store
+
+# Autre application déposée dans le dossier de travail
+nira-crm copie/
+
+# Données de mission et matériel client (confidentiel, non versionné)
+data/
+*.docx
+cartographie-noyau-employes.html
+Guide_Mission_PerfectServe.html
+Brief_ameliorations_ubbiflow.html
+hero-cote-d-azur-foot-feminin.png

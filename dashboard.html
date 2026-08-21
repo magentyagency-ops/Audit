@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Relay — tableau de bord des projets de mission">
+  <title>Relay — Projets</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@500;600;700;800&display=swap');
+    @import url('https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css');
+    :root{--ink:#102a43;--muted:#627d98;--blue:#087af5;--blue-2:#53b1fd;--cyan:#32ade6;--green:#18a67e;--amber:#e99512;--red:#e84d6a;--glass:rgba(255,255,255,.78);--surface:rgba(255,255,255,.65);--field:rgba(253,254,255,.94);--line:rgba(255,255,255,.93);--hair:rgba(89,129,169,.17);--shadow:0 20px 60px rgba(26,93,153,.08);--ease:cubic-bezier(.22,1,.36,1)}
+    body[data-theme="midnight"]{--ink:#f5f9ff;--muted:#aebed0;--blue:#0a84ff;--blue-2:#64d2ff;--cyan:#5ac8fa;--green:#30d19d;--amber:#ff9f0a;--red:#ff5577;--glass:rgba(18,31,49,.76);--surface:rgba(32,48,69,.68);--field:rgba(12,24,40,.82);--line:rgba(255,255,255,.12);--hair:rgba(255,255,255,.1);--shadow:0 25px 70px rgba(0,8,20,.36)}
+    body[data-theme="ocean"]{--ink:#073044;--muted:#557b89;--blue:#0077db;--blue-2:#30b0c7;--cyan:#00a8c6;--green:#139c87;--glass:rgba(244,254,255,.78);--surface:rgba(239,253,254,.66);--field:rgba(247,254,255,.94)}
+    body[data-theme="sunset"]{--ink:#3b2b19;--muted:#826d51;--blue:#d57700;--blue-2:#ffb340;--cyan:#32ade6;--green:#398f69;--glass:rgba(255,251,244,.8);--surface:rgba(255,249,237,.68);--field:rgba(255,252,247,.95)}
+    *{box-sizing:border-box}
+    body{min-height:100vh;margin:0;background:linear-gradient(145deg,#f8fcff,#fff 48%,#f2f9ff);color:var(--ink);font:13px/1.55 Manrope,Arial,sans-serif;transition:color .35s,background .6s}
+    body[data-theme="midnight"]{background:linear-gradient(145deg,#101827,#17253a 48%,#102f35)}
+    body[data-theme="ocean"]{background:linear-gradient(145deg,#f3fdff,#fff 48%,#eaf9ff)}
+    body[data-theme="sunset"]{background:linear-gradient(145deg,#fff8ea,#fff 48%,#eef8ff)}
+    body:before,body:after{content:"";position:fixed;z-index:-1;border-radius:50%;filter:blur(2px);pointer-events:none}
+    body:before{width:650px;height:650px;left:-220px;top:-280px;background:radial-gradient(circle,color-mix(in srgb,var(--blue) 12%,transparent),transparent 68%)}
+    body:after{width:760px;height:760px;right:-300px;bottom:-380px;background:radial-gradient(circle,color-mix(in srgb,var(--cyan) 10%,transparent),transparent 68%)}
+    button,input,textarea,select{font:inherit}
+    .app{width:min(1180px,calc(100% - 32px));margin:auto;padding:16px 0 80px}
+    .glass{border:1px solid var(--line);background:linear-gradient(135deg,color-mix(in srgb,var(--glass) 95%,white 5%),color-mix(in srgb,var(--glass) 80%,transparent));box-shadow:var(--shadow),inset 0 1px 1px rgba(255,255,255,.75);backdrop-filter:blur(22px) saturate(1.2);-webkit-backdrop-filter:blur(22px) saturate(1.2)}
+    .topbar{position:sticky;z-index:30;top:12px;display:flex;align-items:center;gap:14px;padding:11px 14px;border-radius:20px}
+    .wordmark{display:flex;align-items:center;gap:10px;margin-right:auto}
+    .wordmark i{display:grid;place-items:center;width:34px;height:34px;border-radius:12px;background:linear-gradient(135deg,var(--blue),var(--blue-2));color:#fff;font-size:17px;box-shadow:0 9px 20px color-mix(in srgb,var(--blue) 30%,transparent)}
+    .wordmark b{display:block;font-size:14px;letter-spacing:-.05em}
+    .wordmark span{display:block;color:var(--muted);font:500 9px 'DM Mono';letter-spacing:.1em;text-transform:uppercase}
+    .theme-grid{display:flex;gap:6px}
+    .theme-option{display:grid;place-items:center;width:32px;height:32px;border:1px solid var(--hair);border-radius:10px;background:var(--surface);cursor:pointer}
+    .theme-option.active{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--blue) 45%,transparent)}
+    .swatch{width:16px;height:16px;border-radius:50%}
+    .swatch.light{background:linear-gradient(135deg,#087af5 50%,#fff 50%)}.swatch.midnight{background:linear-gradient(135deg,#0a84ff 50%,#17253a 50%)}.swatch.ocean{background:linear-gradient(135deg,#00a8c6 50%,#effcff 50%)}.swatch.sunset{background:linear-gradient(135deg,#ff9f0a 50%,#fff8ea 50%)}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 12px;border:1px solid var(--hair);border-radius:10px;background:var(--surface);color:var(--ink);font-size:10px;font-weight:700;cursor:pointer;transition:.23s var(--ease)}
+    .btn:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(32,84,138,.13)}
+    .btn:active{transform:scale(.96)}
+    .btn.primary{border-color:#0064ce;background:#006bdc;color:#fff;box-shadow:0 6px 14px rgba(0,107,220,.25)}
+    .btn.primary:hover{background:#005fc5}
+    .btn.danger{color:var(--red)}
+    .btn:disabled{cursor:wait;opacity:.55;transform:none}
+    .btn i{font-size:14px}
+    main{padding-top:40px}
+    .page-head{display:flex;align-items:end;justify-content:space-between;gap:18px;margin:0 6px 26px}
+    .eyebrow{margin:0 0 7px;color:var(--blue);font:500 10px 'DM Mono';letter-spacing:.14em;text-transform:uppercase}
+    .page-head h1{margin:0;font-size:38px;line-height:1.06;letter-spacing:-.065em}
+    .page-head p{max-width:640px;margin:9px 0 0;color:var(--muted);font-size:12px}
+    .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px}
+    .metric{padding:17px;border-radius:16px}
+    .metric small{color:var(--muted);font:500 9px 'DM Mono';text-transform:uppercase}
+    .metric strong{display:block;margin-top:7px;font-size:25px;letter-spacing:-.06em}
+    .projects{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:16px}
+    .project-card{position:relative;display:flex;flex-direction:column;gap:14px;padding:20px;border-radius:20px;overflow:hidden;cursor:pointer;transition:.28s var(--ease)}
+    .project-card:hover{transform:translateY(-4px);box-shadow:0 26px 54px rgba(26,93,153,.14)}
+    .project-card:after{content:"";position:absolute;right:-70px;top:-90px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--accent) 22%,transparent),transparent 70%);pointer-events:none}
+    .project-top{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center}
+    .project-mark{display:grid;place-items:center;width:44px;height:44px;border-radius:15px;background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 45%,#ffffff));color:#fff;font:800 15px Manrope;letter-spacing:-.04em}
+    .project-top h2{margin:0;font-size:16px;letter-spacing:-.045em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .project-top span{display:block;margin-top:3px;color:var(--muted);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .project-menu{display:grid;place-items:center;width:30px;height:30px;border:1px solid var(--hair);border-radius:10px;background:var(--surface);color:var(--muted);cursor:pointer}
+    .project-menu:hover{color:var(--red)}
+    .project-card p{position:relative;z-index:1;margin:0;min-height:52px;color:var(--muted);font-size:11px;line-height:1.65;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+    .chips{display:flex;flex-wrap:wrap;gap:6px}
+    .chip{padding:5px 9px;border-radius:99px;background:color-mix(in srgb,var(--accent) 10%,var(--surface));color:var(--accent);font:500 9px 'DM Mono'}
+    .project-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:12px;border-top:1px solid var(--hair);color:var(--muted);font-size:10px}
+    .project-foot b{color:var(--ink);font-size:11px}
+    .new-card{display:grid;place-items:center;min-height:214px;padding:24px;border:1.5px dashed color-mix(in srgb,var(--blue) 34%,transparent);border-radius:20px;background:transparent;color:var(--ink);text-align:center;cursor:pointer;transition:.26s var(--ease)}
+    .new-card:hover{transform:translateY(-4px);background:color-mix(in srgb,var(--blue) 7%,var(--surface));border-color:var(--blue)}
+    .new-card i{display:block;margin-bottom:10px;color:var(--blue);font-size:28px}
+    .new-card b{display:block;font-size:13px;letter-spacing:-.03em}
+    .new-card span{display:block;max-width:260px;margin-top:5px;color:var(--muted);font-size:10px}
+    .empty{display:grid;place-items:center;min-height:230px;padding:32px;border:1px dashed color-mix(in srgb,var(--muted) 25%,transparent);border-radius:16px;text-align:center;color:var(--muted)}
+    .empty i{display:block;margin-bottom:10px;color:var(--blue);font-size:30px}
+    .empty b{display:block;color:var(--ink);font-size:13px}
+    dialog{padding:0;border:0;background:transparent}
+    dialog::backdrop{background:rgba(16,42,67,.34);backdrop-filter:blur(6px)}
+    .modal{width:min(620px,calc(100vw - 34px));padding:24px;border-radius:22px}
+    .modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:18px}
+    .modal-head h2{margin:0;font-size:21px;letter-spacing:-.05em}
+    .modal-head p{margin:6px 0 0;color:var(--muted);font-size:11px}
+    .icon-btn{display:grid;place-items:center;width:34px;height:34px;border:1px solid var(--line);border-radius:11px;background:var(--surface);color:var(--ink);cursor:pointer;font-size:16px}
+    .field-group{display:block;margin-bottom:14px}
+    .field-group label{display:block;margin:0 0 6px;color:var(--muted);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+    .field{width:100%;padding:11px 12px;border:1px solid var(--hair);border-radius:11px;background:var(--field);color:var(--ink);outline:0}
+    .field:focus{border-color:color-mix(in srgb,var(--blue) 55%,transparent);box-shadow:0 0 0 3px color-mix(in srgb,var(--blue) 13%,transparent)}
+    textarea.field{min-height:150px;resize:vertical;font:12px/1.7 Manrope}
+    .hint{display:flex;gap:9px;padding:12px 13px;border-radius:13px;background:color-mix(in srgb,var(--blue) 8%,var(--surface));color:var(--muted);font-size:10px;line-height:1.6}
+    .hint i{color:var(--blue);font-size:14px}
+    .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+    .spinner{width:12px;height:12px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .toast{position:fixed;z-index:60;left:50%;bottom:26px;display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:14px;background:var(--ink);color:#fff;font-size:11px;transform:translate(-50%,24px);opacity:0;pointer-events:none;transition:.3s var(--ease)}
+    .toast.show{transform:translate(-50%,0);opacity:1}
+    .toast.error{background:var(--red)}
+
+      .form-grid.two{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+      .member-list{display:grid;gap:8px;max-height:46vh;overflow:auto;padding-right:2px}
+      .member-row{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:11px;align-items:center;padding:12px 13px;border:1px solid var(--hair);border-radius:14px;background:color-mix(in srgb,var(--field) 68%,transparent)}
+      .member-row.inactive{opacity:.55}
+      .member-avatar{display:grid;place-items:center;width:38px;height:38px;border-radius:13px;background:linear-gradient(135deg,var(--blue),var(--blue-2));color:#fff;font:800 11px Manrope}
+      .member-row b{display:block;font-size:12px}
+      .member-row span{display:block;margin-top:2px;overflow:hidden;color:var(--muted);font-size:10px;text-overflow:ellipsis}
+      .member-actions{display:flex;align-items:center;gap:6px}
+      .member-actions select{padding:7px 8px;border:1px solid var(--hair);border-radius:9px;background:var(--field);color:var(--ink);font-size:10px}
+      .member-tag{padding:4px 8px;border-radius:99px;background:color-mix(in srgb,var(--blue) 10%,var(--surface));color:var(--blue);font:500 8px 'DM Mono';letter-spacing:.06em;text-transform:uppercase}
+      .member-form{margin-top:14px;padding:14px;border:1px solid var(--hair);border-radius:15px;background:color-mix(in srgb,var(--field) 60%,transparent)}
+      .auth-screen{display:grid;place-items:center;min-height:100vh;padding:24px}
+      .auth-card{width:min(420px,100%);padding:30px;border-radius:22px}
+      .auth-brand{display:flex;align-items:center;gap:10px;margin-bottom:22px}
+      .auth-brand i{display:grid;place-items:center;width:36px;height:36px;border-radius:12px;background:linear-gradient(135deg,var(--blue),var(--blue-2));color:#fff;font-size:18px}
+      .auth-brand b{font:800 15px Manrope;letter-spacing:-.05em}
+      .auth-brand span{display:block;color:var(--muted);font:500 9px 'DM Mono';letter-spacing:.14em;text-transform:uppercase}
+      .auth-card h1{margin:0;font-size:26px;letter-spacing:-.06em}
+      .auth-intro{margin:6px 0 20px;color:var(--muted);font-size:11px;line-height:1.6}
+      .auth-card .field-group{margin-bottom:12px}
+      .auth-card label{display:block;margin:0 0 6px;color:var(--muted);font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+      .auth-submit{width:100%;padding:12px;font-size:11px}
+      .auth-reset{width:100%;margin-top:10px;font-size:10px;border-color:transparent;background:transparent;color:var(--muted)}
+      .auth-error{margin:0 0 12px;padding:10px 12px;border-radius:11px;background:color-mix(in srgb,var(--red) 12%,transparent);color:var(--red);font-size:10px;line-height:1.55}
+      .account-wrap{position:relative}
+      .account-btn{display:flex;align-items:center;gap:9px;padding:6px 10px 6px 6px;border:1px solid var(--hair);border-radius:13px;background:var(--surface);color:var(--ink);cursor:pointer;transition:.24s var(--ease)}
+      .account-btn:hover{transform:translateY(-1px);box-shadow:0 8px 18px rgba(40,86,138,.12)}
+      .account-avatar{display:grid;place-items:center;width:29px;height:29px;border-radius:10px;background:linear-gradient(135deg,var(--blue),var(--blue-2));color:#fff;font:800 10px Manrope}
+      .account-id{text-align:left;line-height:1.25;max-width:130px}
+      .account-id b{display:block;overflow:hidden;font-size:10px;letter-spacing:-.02em;text-overflow:ellipsis;white-space:nowrap}
+      .account-id>span{display:block;color:var(--muted);font:500 8px 'DM Mono';text-transform:uppercase}
+      .account-panel{position:absolute;z-index:40;top:46px;right:0;display:none;width:250px;padding:14px;border-radius:16px}
+      .account-wrap.open .account-panel{display:grid;gap:8px}
+      .account-panel>small{color:var(--muted);font:500 9px 'DM Mono';letter-spacing:.1em;text-transform:uppercase}
+      .account-email{margin:0 0 4px;overflow:hidden;font-size:11px;text-overflow:ellipsis}
+    @media (max-width:820px){.metrics{grid-template-columns:repeat(2,1fr)}.page-head{flex-direction:column;align-items:flex-start}}
+  </style>
+</head>
+<body>
+  <div class="auth-screen" id="authScreen" hidden>
+    <section class="auth-card glass">
+      <div class="auth-brand"><i class="ri-radar-line"></i><div><b>Nira Audit</b><span>Mission Control</span></div></div>
+      <h1>Connexion</h1>
+      <p class="auth-intro">Accède aux missions de l’équipe. Les comptes sont créés par un administrateur.</p>
+      <form id="loginForm">
+        <div class="field-group"><label for="loginEmail">Email</label><input class="field" id="loginEmail" name="email" type="email" autocomplete="email" required placeholder="prenom@nira-ia.com"></div>
+        <div class="field-group"><label for="loginPassword">Mot de passe</label><input class="field" id="loginPassword" name="password" type="password" autocomplete="current-password" required placeholder="••••••••"></div>
+        <p class="auth-error" id="authError" hidden></p>
+        <button class="btn primary auth-submit" type="submit"><i class="ri-login-circle-line"></i>Se connecter</button>
+      </form>
+      <button class="btn auth-reset" type="button" id="resetPassword">Mot de passe oublié ?</button>
+    </section>
+  </div>
+
+  <div class="app" id="app" hidden>
+    <nav class="topbar glass" aria-label="Navigation">
+      <div class="wordmark"><i class="ri-radar-line"></i><div><b>Relay</b><span>Mission Control</span></div></div>
+      <div class="theme-grid" id="themeGrid">
+        <button class="theme-option" data-theme="light" title="Clair"><span class="swatch light"></span></button>
+        <button class="theme-option" data-theme="midnight" title="Nuit"><span class="swatch midnight"></span></button>
+        <button class="theme-option" data-theme="ocean" title="Océan"><span class="swatch ocean"></span></button>
+        <button class="theme-option" data-theme="sunset" title="Coucher de soleil"><span class="swatch sunset"></span></button>
+      </div>
+      <button class="btn admin-only" id="openMembers" type="button" hidden><i class="ri-shield-user-line"></i>Équipe</button>
+      <button class="btn primary" id="newProjectTop" type="button"><i class="ri-add-line"></i>Nouveau projet</button>
+      <div class="account-wrap" id="accountWrap">
+        <button class="account-btn" id="accountToggle" type="button" aria-label="Mon compte"><span class="account-avatar" id="accountAvatar">?</span><span class="account-id"><b id="accountName">—</b><span id="accountRole">—</span></span></button>
+        <div class="account-panel glass"><small>Compte</small><p class="account-email" id="accountEmail">—</p><button class="btn" type="button" id="changePassword"><i class="ri-key-2-line"></i>Changer mon mot de passe</button><button class="btn danger" type="button" id="signOut"><i class="ri-logout-box-r-line"></i>Se déconnecter</button></div>
+      </div>
+    </nav>
+
+    <main>
+      <header class="page-head">
+        <div>
+          <p class="eyebrow">Tes missions</p>
+          <h1>Tableau de bord.</h1>
+          <p>Chaque projet a son propre espace : entretiens, documents, cartographie, agenda et assistant. Sélectionne une mission pour l’ouvrir, ou décris-en une nouvelle en quelques phrases.</p>
+        </div>
+      </header>
+
+      <div class="metrics">
+        <article class="metric glass"><small>Projets actifs</small><strong id="metricProjects">0</strong></article>
+        <article class="metric glass"><small>Entretiens</small><strong id="metricInterviews">0</strong></article>
+        <article class="metric glass"><small>Synthèses</small><strong id="metricSummaries">0</strong></article>
+        <article class="metric glass"><small>Actions ouvertes</small><strong id="metricActions">0</strong></article>
+      </div>
+
+      <section class="projects" id="projectGrid"></section>
+    </main>
+  </div>
+
+  <dialog id="projectDialog">
+    <form class="modal glass" id="projectForm">
+      <div class="modal-head">
+        <div><p class="eyebrow">Nouveau projet</p><h2>Décris la mission.</h2><p>Quelques phrases suffisent : le client, le contexte, ce que tu dois auditer ou construire. L’assistant en tire le contexte de départ du projet.</p></div>
+        <button type="button" class="icon-btn" data-close="projectDialog"><i class="ri-close-line"></i></button>
+      </div>
+      <div class="field-group">
+        <label for="projectDescription">Le projet en quelques phrases</label>
+        <textarea class="field" id="projectDescription" required placeholder="Ex. Mission de trois mois chez Ubbiflow, plateforme d’annonces auto. On doit auditer le parcours des leads entrants entre le site, le CRM et les concessions, comprendre pourquoi les relances traînent, puis proposer un processus cible avec l’équipe commerciale."></textarea>
+      </div>
+      <div class="field-group">
+        <label for="projectName">Nom du projet <span style="text-transform:none;letter-spacing:0">— facultatif, sinon l’assistant le propose</span></label>
+        <input class="field" id="projectName" placeholder="Ex. Ubbiflow — Leads entrants">
+      </div>
+      <div class="hint"><i class="ri-sparkling-2-line"></i><span>À la création, l’assistant prépare l’objectif, le périmètre, les parties prenantes, les questions clés, les livrables et les premières actions. Tout reste modifiable ensuite dans l’espace du projet.</span></div>
+      <div class="modal-actions">
+        <button type="button" class="btn" data-close="projectDialog">Annuler</button>
+        <button class="btn primary" type="submit" id="createProjectButton"><i class="ri-add-line"></i>Créer le projet</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="confirmDialog">
+    <div class="modal glass" style="width:min(430px,calc(100vw - 34px))">
+      <div class="modal-head"><div><h2>Confirmer</h2><p id="confirmDialogMessage">Es-tu sûr ?</p></div></div>
+      <div class="modal-actions"><button class="btn" type="button" id="cancelConfirmDialog">Annuler</button><button class="btn danger" type="button" id="confirmDialogButton">Supprimer</button></div>
+    </div>
+  </dialog>
+
+  <dialog id="passwordDialog"><form class="modal glass" id="passwordForm" style="width:min(430px,calc(100vw - 34px))"><div class="modal-head"><div><h2>Changer mon mot de passe</h2><p>Il remplace immédiatement l’ancien.</p></div><button type="button" class="icon-btn" data-close="passwordDialog"><i class="ri-close-line"></i></button></div><div class="field-group"><label for="newPassword">Nouveau mot de passe</label><input class="field" id="newPassword" type="password" required minlength="8" placeholder="8 caractères minimum"></div><div class="modal-actions"><button class="btn" type="button" data-close="passwordDialog">Annuler</button><button class="btn primary" type="submit"><i class="ri-check-line"></i>Enregistrer</button></div></form></dialog>
+
+  <dialog id="membersDialog">
+    <div class="modal glass" style="width:min(720px,calc(100vw - 34px))">
+      <div class="modal-head">
+        <div><p class="eyebrow">Administration</p><h2>Comptes de l’équipe</h2><p>Chaque compte actif accède aux projets de l’équipe. Seul un administrateur gère les accès.</p></div>
+        <button type="button" class="icon-btn" data-close="membersDialog"><i class="ri-close-line"></i></button>
+      </div>
+      <div id="memberList" class="member-list"></div>
+      <form id="memberForm" class="member-form" hidden>
+        <div class="form-grid two">
+          <div class="field-group"><label for="memberName">Nom complet</label><input class="field" id="memberName" placeholder="Ex. Clarence Gomis"></div>
+          <div class="field-group"><label for="memberEmail">Email</label><input class="field" id="memberEmail" type="email" required placeholder="prenom@nira-ia.com"></div>
+          <div class="field-group"><label for="memberPassword">Mot de passe provisoire</label><input class="field" id="memberPassword" type="password" required minlength="8" placeholder="8 caractères minimum"></div>
+          <div class="field-group"><label for="memberRole">Rôle</label><select class="field" id="memberRole"><option value="user">Consultant</option><option value="admin">Administrateur</option></select></div>
+        </div>
+        <div class="modal-actions"><button class="btn" type="button" id="cancelMember">Annuler</button><button class="btn primary" type="submit"><i class="ri-user-add-line"></i>Créer le compte</button></div>
+      </form>
+      <div class="modal-actions" id="memberListActions"><button class="btn" type="button" id="refreshMembers"><i class="ri-refresh-line"></i>Actualiser</button><button class="btn primary" type="button" id="addMember"><i class="ri-user-add-line"></i>Nouveau compte</button></div>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast"></div>
+  <script type="module" src="/src/dashboard.ts"></script>
+</body>
+</html>

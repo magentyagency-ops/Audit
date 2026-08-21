@@ -38,10 +38,20 @@ export async function currentProfile(known?: SessionUser): Promise<Profile | nul
   return data as Profile
 }
 
+/**
+ * Jeton conservé en mémoire à la connexion.
+ *
+ * Il sert de secours quand le navigateur ne restitue pas la session stockée
+ * (navigation privée, blocage du stockage, extension de confidentialité) :
+ * l'application reste alors utilisable pour la durée de l'onglet.
+ */
+let fallbackToken: string | null = null
+
 export async function signIn(email: string, password: string): Promise<SessionUser> {
   const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
   if (error) throw new Error(error.message === 'Invalid login credentials' ? 'Email ou mot de passe incorrect.' : error.message)
   if (!data.user) throw new Error('Connexion refusée par Supabase.')
+  fallbackToken = data.session?.access_token ?? null
   return data.user
 }
 
@@ -55,6 +65,7 @@ export function clearStoredSession() {
 }
 
 export async function signOut(): Promise<void> {
+  fallbackToken = null
   await supabase.auth.signOut()
 }
 
@@ -71,7 +82,7 @@ export async function updateOwnPassword(password: string): Promise<void> {
 /** Jeton d'accès transmis à l'API de mission et aux fonctions d'administration. */
 export async function accessToken(): Promise<string> {
   const { data } = await supabase.auth.getSession()
-  const token = data.session?.access_token
+  const token = data.session?.access_token ?? fallbackToken
   if (!token) throw new Error('Session expirée, reconnecte-toi.')
   return token
 }

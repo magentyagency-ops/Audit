@@ -11,6 +11,8 @@ const $ = <T extends HTMLElement = HTMLElement>(selector: string) => document.qu
 
 let profile: Profile | null = null
 let starting = false
+/** Dernier compte authentifié dans cet onglet, réutilisé par les démarrages suivants. */
+let signedInUser: SessionUser | null = null
 
 export function activeProfile() { return profile }
 export function isAdmin() { return profile?.role === 'admin' }
@@ -81,7 +83,7 @@ function initAccountMenu(notify: (message: string, error?: boolean) => void) {
   $('#accountToggle')!.addEventListener('click', (event) => { event.stopPropagation(); wrap.classList.toggle('open') })
   document.addEventListener('click', (event) => { if (!wrap.contains(event.target as Node)) wrap.classList.remove('open') })
 
-  $('#signOut')!.addEventListener('click', async () => { await signOut(); window.location.reload() })
+  $('#signOut')!.addEventListener('click', async () => { await signOut(); clearStoredSession(); window.location.reload() })
 
   $('#changePassword')!.addEventListener('click', () => {
     wrap.classList.remove('open')
@@ -108,22 +110,21 @@ type GateOptions = {
 let options: GateOptions
 
 async function start(known?: SessionUser) {
-  if (starting) return
+  const user = known ?? signedInUser ?? undefined
+  if (user) signedInUser = user
+  // Un démarrage sans compte connu ne doit pas court-circuiter celui de la
+  // connexion, qui dispose lui de la session fraîchement obtenue.
+  if (starting && !known) return
   starting = true
   try {
     let loaded: Profile | null
-    try { loaded = await currentProfile(known) }
+    try { loaded = await currentProfile(user) }
     catch (error) { showAuthScreen((error as Error).message); return }
 
     if (!loaded) {
-      // Aucune session au démarrage : écran de connexion normal. Après une
-      // connexion acceptée, c'est que le navigateur ne conserve pas la session.
-      if (known) {
-        clearStoredSession()
-        showAuthScreen('Connexion acceptée mais la session n’a pas pu être conservée. Autorise le stockage local pour ce site (navigation privée, blocage des cookies ou extension de confidentialité), puis réessaie.')
-      } else {
-        showAuthScreen('')
-      }
+      // L'application est déjà ouverte : une session illisible ne doit pas la refermer.
+      if (profile) { console.warn('[nira-audit] session non relue, la session en cours est conservée'); return }
+      showAuthScreen('')
       return
     }
 

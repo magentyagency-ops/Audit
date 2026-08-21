@@ -1,4 +1,5 @@
-import { supabase } from './supabase.js'
+import { createClient } from '@supabase/supabase-js'
+import { supabase, supabaseAnonKey, supabaseUrl } from './supabase.js'
 
 export type Role = 'admin' | 'user'
 export type Profile = { id: string; email: string; full_name: string; role: Role; active: boolean; created_at: string }
@@ -11,6 +12,26 @@ export type Profile = { id: string; email: string; full_name: string; role: Role
  */
 
 export type SessionUser = { id: string; email?: string }
+
+/**
+ * Jeton conservé en mémoire à la connexion.
+ *
+ * Certains navigateurs ne restituent pas la session stockée (navigation privée,
+ * blocage du stockage, extension de confidentialité). Le client Supabase repart
+ * alors sur la clé anonyme, et la lecture du profil ne renvoie plus rien à cause
+ * de la RLS. On garde donc le jeton ici pour authentifier explicitement les
+ * requêtes, et l'application reste utilisable pour la durée de l'onglet.
+ */
+let fallbackToken: string | null = null
+
+/** Client authentifié avec le jeton en mémoire, à défaut le client à session persistée. */
+function authedClient() {
+  if (!fallbackToken) return supabase
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+    global: { headers: { Authorization: `Bearer ${fallbackToken}` } },
+  })
+}
 
 /**
  * Profil du compte connecté.
@@ -29,7 +50,7 @@ export async function currentProfile(known?: SessionUser): Promise<Profile | nul
   }
   if (!user) return null
 
-  const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
+  const { data, error } = await authedClient().from('profiles').select('*').eq('id', user.id).maybeSingle()
   if (error) throw new Error(`Profil illisible (${error.code ?? 'erreur'}) : ${error.message}`)
   if (!data) {
     throw new Error(`Aucun profil n’est associé à ${user.email}. Exécute supabase/relay-auth.sql dans Supabase.`)
@@ -37,15 +58,6 @@ export async function currentProfile(known?: SessionUser): Promise<Profile | nul
   if (!data.active) throw new Error('Ce compte est désactivé. Contacte un administrateur.')
   return data as Profile
 }
-
-/**
- * Jeton conservé en mémoire à la connexion.
- *
- * Il sert de secours quand le navigateur ne restitue pas la session stockée
- * (navigation privée, blocage du stockage, extension de confidentialité) :
- * l'application reste alors utilisable pour la durée de l'onglet.
- */
-let fallbackToken: string | null = null
 
 export async function signIn(email: string, password: string): Promise<SessionUser> {
   const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })

@@ -28,7 +28,8 @@ let fallbackToken: string | null = null
 function authedClient() {
   if (!fallbackToken) return supabase
   return createClient(supabaseUrl, supabaseAnonKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
+    // Clé de stockage distincte : ce client ne partage pas la session du client principal.
+    auth: { autoRefreshToken: false, persistSession: false, storageKey: 'nira-audit-scoped' },
     global: { headers: { Authorization: `Bearer ${fallbackToken}` } },
   })
 }

@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { authConfigured, currentUser, requireSession } from './auth.js'
-import { getFile, putFile, readJob, removeFile, readProjectState, storageMode, writeJob, writeProjectState, type StoredJob } from './storage.js'
+import { getFile, putFile, readJob, removeFile, readProjectState, resolveStorageMode, writeJob, writeProjectState, type StoredJob } from './storage.js'
 import { waitUntil } from '@vercel/functions'
 import { handleAdminUsers } from './adminUsers.js'
 import { ProjectBriefSchema, activeProject, bootstrapProjects, findProject, insertProject, listProjects, patchProject, projectStateFile, projectStats, removeProject, withProject, type Project, type ProjectBrief } from './projects.js'
@@ -732,7 +732,7 @@ app.use('/api', (req, res, next) => {
   }).catch(next)
 })
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, openaiConfigured: Boolean(openai), authConfigured: authConfigured(), storage: storageMode, model }))
+app.get('/api/health', (_req, res) => res.json({ ok: true, openaiConfigured: Boolean(openai), authConfigured: authConfigured(), storage: resolveStorageMode(), model }))
 
 app.get('/api/projects', async (_req, res, next) => {
   try {
@@ -1200,7 +1200,7 @@ app.get('/api/documents/:filename/open', async (req, res, next) => {
   try {
     const { filename, html } = await readGeneratedDocument(req.params.filename)
     // En ligne, « ouvrir » revient à afficher le document : rien n'est écrit sur le disque du serveur.
-    if (storageMode !== 'local') return res.type('html').send(html)
+    if (resolveStorageMode() !== 'local') return res.type('html').send(html)
     const downloadedFile = path.join(downloadsDirectory, filename)
     await fs.mkdir(downloadsDirectory, { recursive: true })
     await fs.writeFile(downloadedFile, html, 'utf8')
@@ -1360,7 +1360,7 @@ app.use((error: Error & { status?: number; statusCode?: number; code?: string; t
   res.status(status).json({ error: apiMessage || 'Une erreur est survenue.' })
 })
 
-const bootstrapped = storageMode === 'local' ? await bootstrapProjects() : []
+const bootstrapped = resolveStorageMode() === 'local' ? await bootstrapProjects() : []
 for (const project of bootstrapped) {
   if (project.id !== 'perfectserve') continue
   await withProject(project, async () => {
@@ -1374,7 +1374,7 @@ for (const project of bootstrapped) {
 
 // En local le serveur écoute ; en serverless, api/index.ts réutilise l'application telle quelle.
 if (!process.env.VERCEL) {
-  app.listen(3001, '127.0.0.1', () => console.log(`Relay API listening on http://127.0.0.1:3001 · OpenAI ${openai ? 'ready' : 'not configured'} · Auth ${authConfigured() ? 'ready' : 'not configured'} · Stockage ${storageMode} · ${model}`))
+  app.listen(3001, '127.0.0.1', () => console.log(`Relay API listening on http://127.0.0.1:3001 · OpenAI ${openai ? 'ready' : 'not configured'} · Auth ${authConfigured() ? 'ready' : 'not configured'} · Stockage ${resolveStorageMode()} · ${model}`))
 }
 
 export default app

@@ -13,15 +13,16 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 export type AdminResult = { status: number; body: unknown }
 
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || ''
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+// Lecture différée : ce module est importé avant que dotenv n'ait chargé .env.local.
+const supabaseUrl = () => process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || ''
+const serviceRoleKey = () => process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 
 class HttpError extends Error {
   constructor(readonly status: number, message: string) { super(message) }
 }
 
 const admin = (): SupabaseClient =>
-  createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
+  createClient(supabaseUrl(), serviceRoleKey(), { auth: { autoRefreshToken: false, persistSession: false } })
 
 type Caller = { id: string; email: string }
 
@@ -105,7 +106,7 @@ async function deleteMember(body: Record<string, unknown>, caller: Caller) {
 
 /** Point d'entrée commun : le transport (Express ou Vercel) ne fait que passer la méthode, le jeton et le corps. */
 export async function handleAdminUsers(method: string, token: string, body: Record<string, unknown>): Promise<AdminResult> {
-  if (!supabaseUrl || !serviceRoleKey) {
+  if (!supabaseUrl() || !serviceRoleKey()) {
     return { status: 503, body: { error: 'Administration indisponible : SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY doivent être définis (Vercel, ou .env.local en développement).' } }
   }
   try {

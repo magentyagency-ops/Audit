@@ -18,8 +18,9 @@ export type AuthenticatedUser = { id: string; email: string; fullName: string; r
 const defaultSupabaseUrl = 'https://bmguarnqwgqhzhcigdmj.supabase.co'
 const defaultSupabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtZ3Vhcm5xd2dxaHpoY2lnZG1qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcwMDc0MTIsImV4cCI6MjEwMjU4MzQxMn0.GPxGdpr_Q1rH2OG3GUuQBoQkcPbid81ZNzUElEa9_ow'
 
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || defaultSupabaseUrl
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || defaultSupabaseAnonKey
+// Lecture différée : ce module est importé avant que dotenv n'ait chargé .env.local.
+const supabaseUrl = () => process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || defaultSupabaseUrl
+const supabaseAnonKey = () => process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || defaultSupabaseAnonKey
 
 const store = new AsyncLocalStorage<{ user: AuthenticatedUser }>()
 const cache = new Map<string, { user: AuthenticatedUser; expiresAt: number }>()
@@ -28,7 +29,7 @@ const cacheTtl = 60_000
 /** Routes appelées hors de l'application (redirection OAuth, ouverture d'un document dans le navigateur). */
 const publicPaths = [/^\/api\/health$/, /^\/api\/outlook\/callback/, /^\/api\/documents\//]
 
-export function authConfigured() { return Boolean(supabaseUrl && supabaseAnonKey) }
+export function authConfigured() { return Boolean(supabaseUrl() && supabaseAnonKey()) }
 
 export function currentUser(): AuthenticatedUser {
   const context = store.getStore()
@@ -44,7 +45,7 @@ export async function verifyToken(token: string): Promise<AuthenticatedUser> {
   const cached = cache.get(token)
   if (cached && cached.expiresAt > Date.now()) return cached.user
 
-  const client = createClient(supabaseUrl, supabaseAnonKey, {
+  const client = createClient(supabaseUrl(), supabaseAnonKey(), {
     auth: { autoRefreshToken: false, persistSession: false },
     global: { headers: { Authorization: `Bearer ${token}` } },
   })

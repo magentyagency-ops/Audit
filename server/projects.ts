@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
-import { readProjectState, readRegistryRaw, removeProjectStorage, storageMode, writeProjectState, writeRegistryRaw } from './storage.js'
+import { readProjectState, readRegistryRaw, removeProjectStorage, resolveStorageMode, writeProjectState, writeRegistryRaw } from './storage.js'
 
 export const ProjectBriefSchema = z.object({
   name: z.string(),
@@ -155,7 +155,7 @@ export async function projectStats(id: string) {
 export async function bootstrapProjects() {
   const registry = await readRegistry()
   if (registry.projects.length) return registry.projects
-  if (storageMode !== 'local') return []
+  if (resolveStorageMode() !== 'local') return []
   const hasLegacyState = await fs.access(legacyStateFile).then(() => true).catch(() => false)
   if (!hasLegacyState) return []
   const project = await insertProject({

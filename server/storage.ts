@@ -24,24 +24,27 @@ const projectsRoot = path.join(dataRoot, 'projects')
 const documentDirectory = path.join(dataRoot, 'generated-documents')
 const contextDirectory = path.join(dataRoot, 'context-documents')
 
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || ''
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+// Lecture différée : ce module est importé avant que dotenv n'ait chargé
+// .env.local, une lecture au chargement ne verrait donc rien en développement.
+const supabaseUrl = () => process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || ''
+const serviceRoleKey = () => process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 
-export const storageMode: StorageMode =
-  process.env.RELAY_STORAGE === 'local' ? 'local'
-  : process.env.RELAY_STORAGE === 'supabase' ? 'supabase'
-  : supabaseUrl && serviceRoleKey ? 'supabase'
-  : 'local'
+export function resolveStorageMode(): StorageMode {
+  if (process.env.RELAY_STORAGE === 'local') return 'local'
+  if (process.env.RELAY_STORAGE === 'supabase') return 'supabase'
+  return supabaseUrl() && serviceRoleKey() ? 'supabase' : 'local'
+}
 
 export const bucket = 'relay-files'
 
 let client: SupabaseClient | null = null
 
 export function serviceClient(): SupabaseClient {
-  if (!supabaseUrl || !serviceRoleKey) {
+  const url = supabaseUrl(), key = serviceRoleKey()
+  if (!url || !key) {
     throw Object.assign(new Error('Stockage Supabase indisponible : SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY sont requis.'), { status: 503 })
   }
-  client ??= createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
+  client ??= createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
   return client
 }
 
@@ -59,7 +62,7 @@ async function ensureBucket() {
 /* ------------------------------------------------------------------ projets */
 
 export async function readRegistryRaw<T>(fallback: T): Promise<T> {
-  if (storageMode === 'local') {
+  if (resolveStorageMode() === 'local') {
     try { return JSON.parse(await fs.readFile(registryFile, 'utf8')) as T }
     catch { return fallback }
   }
@@ -69,7 +72,7 @@ export async function readRegistryRaw<T>(fallback: T): Promise<T> {
 }
 
 export async function writeRegistryRaw(registry: { projects: Array<{ id: string; createdAt?: string }> }) {
-  if (storageMode === 'local') {
+  if (resolveStorageMode() === 'local') {
     await fs.mkdir(dataRoot, { recursive: true })
     const temp = `${registryFile}.tmp`
     await fs.writeFile(temp, JSON.stringify(registry, null, 2), 'utf8')
@@ -90,7 +93,7 @@ export async function writeRegistryRaw(registry: { projects: Array<{ id: string;
 }
 
 export async function readProjectState<T>(projectId: string): Promise<T | null> {
-  if (storageMode === 'local') {
+  if (resolveStorageMode() === 'local') {
     try { return JSON.parse(await fs.readFile(path.join(projectsRoot, projectId, 'mission-control.json'), 'utf8')) as T }
     catch { return null }
   }
@@ -100,7 +103,7 @@ export async function readProjectState<T>(projectId: string): Promise<T | null> 
 }
 
 export async function writeProjectState(projectId: string, state: unknown) {
-  if (storageMode === 'local') {
+  if (resolveStorageMode() === 'local') {
     const file = path.join(projectsRoot, projectId, 'mission-control.json')
     await fs.mkdir(path.dirname(file), { recursive: true })
     const temp = `${file}.tmp`
@@ -113,7 +116,7 @@ export async function writeProjectState(projectId: string, state: unknown) {
 }
 
 export async function removeProjectStorage(projectId: string) {
-  if (storageMode === 'local') {
+  if (resolveStorageMode() === 'local') {
     await fs.rm(path.join(projectsRoot, projectId), { recursive: true, force: true })
     return
   }
@@ -127,7 +130,7 @@ export async function removeProjectStorage(projectId: string) {
 /** Chemin logique d'un fichier : `documents/<nom>.html` ou `context/<id>-<nom>`. */
 export async function putFile(key: string, content: Buffer | string, contentType: string) {
   const body = typeof content === 'string' ? Buffer.from(content, 'utf8') : content
-  if (storageMode === 'local') {
+  if (resolveStorageMode() === 'local') {
     const file = localPath(key)
     await fs.mkdir(path.dirname(file), { recursive: true })
     await fs.writeFile(file, body)
@@ -140,7 +143,7 @@ export async function putFile(key: string, content: Buffer | string, contentType
 }
 
 export async function getFile(key: string): Promise<Buffer> {
-  if (storageMode === 'local') return fs.readFile(localPath(key))
+  if (resolveStorageMode() === 'local') return fs.readFile(localPath(key))
   await ensureBucket()
   const { data, error } = await serviceClient().storage.from(bucket).download(key)
   if (error || !data) throw Object.assign(new Error('Fichier introuvable.'), { status: 404 })
@@ -148,7 +151,7 @@ export async function getFile(key: string): Promise<Buffer> {
 }
 
 export async function removeFile(key: string) {
-  if (storageMode === 'local') {
+  if (resolveStorageMode() === 'local') {
     await fs.rm(localPath(key), { force: true })
     return
   }
@@ -178,7 +181,7 @@ const localJobs = new Map<string, StoredJob>()
  * invocations, donc stocké en base.
  */
 export async function writeJob(job: StoredJob) {
-  if (storageMode === 'local') { localJobs.set(job.id, job); return }
+  if (resolveStorageMode() === 'local') { localJobs.set(job.id, job); return }
   const { error } = await serviceClient().from('relay_jobs').upsert({
     id: job.id, status: job.status, created_at: job.createdAt, result: job.result ?? null, error: job.error ?? null,
   })
@@ -186,7 +189,7 @@ export async function writeJob(job: StoredJob) {
 }
 
 export async function readJob(id: string): Promise<StoredJob | null> {
-  if (storageMode === 'local') return localJobs.get(id) ?? null
+  if (resolveStorageMode() === 'local') return localJobs.get(id) ?? null
   const { data, error } = await serviceClient().from('relay_jobs').select('*').eq('id', id).maybeSingle()
   if (error) throw new Error(`Lecture du traitement impossible : ${error.message}`)
   if (!data) return null

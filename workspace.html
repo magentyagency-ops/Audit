@@ -3,8 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Relay — espace local de pilotage de mission">
-  <title>Relay — Espace de mission</title>
+  <meta name="description" content="Nira Audit — espace local de pilotage de mission">
+  <title>Nira Audit — Espace de mission</title>
+  <link rel="icon" type="image/png" href="/logo.png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Nira Audit">
+  <meta name="theme-color" content="#087af5">
   <style>
     @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@500;600;700;800&display=swap');
     @import url('https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.css');
@@ -78,7 +86,8 @@ html{scroll-behavior:smooth}body{min-height:100vh;margin:0;background:linear-gra
       .auth-screen{display:grid;place-items:center;min-height:100vh;padding:24px}
       .auth-card{width:min(420px,100%);padding:30px;border-radius:22px}
       .auth-brand{display:flex;align-items:center;gap:10px;margin-bottom:22px}
-      .auth-brand i{display:grid;place-items:center;width:36px;height:36px;border-radius:12px;background:linear-gradient(135deg,var(--blue),var(--blue-2));color:#fff;font-size:18px}
+      .auth-brand img,.auth-brand i{display:grid;place-items:center;width:36px;height:36px;border-radius:10px;object-fit:contain}
+      .auth-brand i{background:linear-gradient(135deg,var(--blue),var(--blue-2));color:#fff;font-size:18px}
       .auth-brand b{font:800 15px Manrope;letter-spacing:-.05em}
       .auth-brand span{display:block;color:var(--muted);font:500 9px 'DM Mono';letter-spacing:.14em;text-transform:uppercase}
       .auth-card h1{margin:0;font-size:26px;letter-spacing:-.06em}
@@ -127,10 +136,10 @@ html{scroll-behavior:smooth}body{min-height:100vh;margin:0;background:linear-gra
     </style>
   </head>
 <body>
-  <div class="launch-screen" id="launchScreen" role="status" aria-label="Chargement"><b class="launch-wordmark">NIRA AUDIT</b></div>
+  <div class="launch-screen" id="launchScreen" role="status" aria-label="Chargement"><div style="display:flex;flex-direction:column;align-items:center;gap:14px"><img src="/logo.png" alt="Nira Audit" style="width:48px;height:48px;border-radius:12px;object-fit:contain"><b class="launch-wordmark">NIRA AUDIT</b></div></div>
   <div class="auth-screen" id="authScreen" hidden>
     <section class="auth-card glass">
-      <div class="auth-brand"><i class="ri-radar-line"></i><div><b>Nira Audit</b><span>Mission Control</span></div></div>
+      <div class="auth-brand"><img src="/logo.png" alt="Nira Audit" width="36" height="36"><div><b>Nira Audit</b><span>Mission Control</span></div></div>
       <h1>Connexion</h1>
       <p class="auth-intro">Accède aux missions de l’équipe. Les comptes sont créés par un administrateur.</p>
       <form id="loginForm" novalidate>

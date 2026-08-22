@@ -2,7 +2,6 @@ import { accessToken, type Profile, type Role } from './auth.js'
 import { activeProfile, bootAuth, isAdmin } from './authGate.js'
 import { adminApi } from './adminApi.js'
 
-type Theme = 'light' | 'midnight' | 'ocean' | 'sunset'
 type ProjectBrief = {
   name: string; client: string; sector: string; missionType: string; objective: string
   scope: string[]; stakeholders: string[]; keyQuestions: string[]; deliverables: string[]; firstSteps: string[]
@@ -15,7 +14,6 @@ type Project = {
 
 const $ = <T extends HTMLElement = HTMLElement>(selector: string) => document.querySelector<T>(selector)
 const escapeHtml = (value: string) => value.replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character] ?? character))
-const themeStorageKey = 'relay-theme'
 
 let projects: Project[] = []
 let toastTimer: number | undefined
@@ -40,12 +38,6 @@ function toast(message: string, error = false) {
   element.classList.add('show')
   window.clearTimeout(toastTimer)
   toastTimer = window.setTimeout(() => element.classList.remove('show'), 5000)
-}
-
-function setTheme(theme: Theme) {
-  document.body.dataset.theme = theme === 'light' ? '' : theme
-  window.localStorage.setItem(themeStorageKey, theme)
-  document.querySelectorAll<HTMLElement>('.theme-option').forEach((button) => button.classList.toggle('active', button.dataset.theme === theme))
 }
 
 function confirmDeletion(message: string): Promise<boolean> {
@@ -247,7 +239,6 @@ function attachEvents() {
   $('#newProjectTop')!.addEventListener('click', () => $<HTMLDialogElement>('#projectDialog')!.showModal())
   $<HTMLFormElement>('#projectForm')!.addEventListener('submit', (event) => void createProject(event))
   document.querySelectorAll<HTMLElement>('[data-close]').forEach((button) => button.addEventListener('click', () => $<HTMLDialogElement>(`#${button.dataset.close}`)!.close()))
-  document.querySelectorAll<HTMLElement>('.theme-option').forEach((button) => button.addEventListener('click', () => setTheme(button.dataset.theme as Theme)))
   $('#projectGrid')!.addEventListener('click', (event) => {
     const target = event.target as HTMLElement
     const remove = target.closest<HTMLElement>('[data-delete]')
@@ -262,7 +253,6 @@ function attachEvents() {
 }
 
 async function start() {
-  setTheme((window.localStorage.getItem(themeStorageKey) as Theme) || 'light')
   attachEvents()
   attachMemberEvents()
   await bootAuth({

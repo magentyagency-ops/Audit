@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title>Nira Audit — Diagnostic de connexion</title>
   <link rel="icon" type="image/png" href="/logo.png">
   <style>
@@ -32,6 +32,27 @@
     .mark{font-size:16px;text-align:center}
     .step.fail{border-color:rgba(232,77,106,.4);background:#fff6f8}
   </style>
+    <style>
+      /* ===================== Comportement d'application =====================
+         Pas de zoom, pas de rebond élastique, pas de surlignage au toucher :
+         l'ensemble doit se comporter comme une application installée. */
+      html{height:100%;overscroll-behavior:none;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+      body{overscroll-behavior:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+      button,a,.nav-btn,.segment,.icon-btn,.mini-btn,.account-btn{-webkit-touch-callout:none}
+      @media (max-width: 820px) {
+        /* Encoche et barre d'accueil : le contenu ne passe jamais dessous. */
+        .app{
+          padding-top:max(10px,env(safe-area-inset-top));
+          padding-bottom:calc(58px + env(safe-area-inset-bottom));
+          padding-left:env(safe-area-inset-left);
+          padding-right:env(safe-area-inset-right);
+        }
+        .topbar{top:max(8px,env(safe-area-inset-top))}
+        .toast{bottom:calc(14px + env(safe-area-inset-bottom))}
+        /* Les commandes ne se sélectionnent pas au appui long ; les contenus, si. */
+        .topbar,.nav,.nav-btn,.segmented,.segment,.btn,.account-btn,.brand,.wordmark{user-select:none!important;-webkit-user-select:none!important}
+      }
+    </style>
 </head>
 <body>
   <div class="diag-brand"><img src="/logo.png" alt="Nira Audit"><div><b>Nira Audit</b><span>Diagnostic</span></div></div>
@@ -45,5 +66,12 @@
   </form>
   <div id="steps"></div>
   <script type="module" src="/src/diagnostic.ts"></script>
+  <script>
+    // Safari applique encore le pincement dans un onglet : on le neutralise ici,
+    // le reste (double-tape) est couvert par touch-action: manipulation.
+    for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
+      document.addEventListener(type, function (event) { event.preventDefault() }, { passive: false })
+    }
+  </script>
 </body>
 </html>

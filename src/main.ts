@@ -146,17 +146,9 @@ function setButtonLoading(button: HTMLButtonElement, loading: boolean, label?: s
   else { button.disabled = false; if (button.dataset.label) button.innerHTML = button.dataset.label }
 }
 
-function setTheme(theme: Theme, persist = true) {
-  document.body.dataset.theme = theme === 'light' ? '' : theme
-  $$('.theme-option[data-theme]').forEach((button) => button.classList.toggle('active', button.dataset.theme === theme))
-  window.localStorage.setItem('relay-theme', theme)
-  if (persist) void api('/api/preferences', { method: 'PUT', body: JSON.stringify({ theme }) }).catch((error) => toast(error.message, true))
-}
-
 function showView(id: string) {
   $$('.view').forEach((view) => view.classList.toggle('active', view.id === id))
   $$('.nav-btn').forEach((button) => button.classList.toggle('active', button.dataset.view === id))
-  $('.theme-wrap')?.classList.remove('open')
   window.scrollTo({ top: 0, behavior: 'smooth' })
   if (id === 'slack') void refreshSlack().catch((error) => toast(error.message, true))
   if (id === 'calendar') void refreshCalendar().catch((error) => toast(error.message, true))
@@ -672,7 +664,7 @@ async function deleteCollaborator() {
   })
 }
 
-function renderAll() { setTheme(state.theme, false); renderProjectIdentity(); $<HTMLTextAreaElement>('#notesInput')!.value = state.notes; renderPeopleSuggestions(); renderDashboard(); renderDocuments(); renderInterviews(); renderCollaborators(); renderProjectSummary(); renderMap(); renderAssistant() }
+function renderAll() { renderProjectIdentity(); $<HTMLTextAreaElement>('#notesInput')!.value = state.notes; renderPeopleSuggestions(); renderDashboard(); renderDocuments(); renderInterviews(); renderCollaborators(); renderProjectSummary(); renderMap(); renderAssistant() }
 
 function startOfMonthGrid(date: Date) { const next = new Date(date.getFullYear(), date.getMonth(), 1); const day = (next.getDay() + 6) % 7; next.setDate(next.getDate() - day); return next }
 function localDateKey(date: Date) { const year = date.getFullYear(); const month = String(date.getMonth() + 1).padStart(2, '0'); const day = String(date.getDate()).padStart(2, '0'); return `${year}-${month}-${day}` }

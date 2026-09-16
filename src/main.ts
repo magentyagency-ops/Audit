@@ -52,6 +52,8 @@ type OutlookStatus = { configured: boolean; connected: boolean; account?: string
 type CalendarEvent = { id: string; subject: string; start: { dateTime: string }; end: { dateTime: string }; location?: { displayName?: string }; bodyPreview?: string; participant?: string; role?: string; isAllDay?: boolean }
 type ContextDocument = { id: string; name: string; mimeType: string; size: number; extractedText?: string; createdAt: string }
 
+import { exportTranscripts } from './exportTranscripts.js'
+
 const $ = <T extends HTMLElement = HTMLElement>(selector: string) => document.querySelector<T>(selector)
 const $$ = <T extends HTMLElement = HTMLElement>(selector: string) => Array.from(document.querySelectorAll<T>(selector))
 const escapeHtml = (value: string) => value.replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character] ?? character))
@@ -590,6 +592,7 @@ function setInterviewTab(tab: 'interviews' | 'collaborators') {
   $('#interviewsPanel')!.hidden = tab !== 'interviews'
   $('#collaboratorsPanel')!.hidden = tab !== 'collaborators'
   $('#newInterview')!.hidden = tab !== 'interviews'
+  $('#exportTranscripts')!.hidden = tab !== 'interviews'
   $('#newCollaborator')!.hidden = tab !== 'collaborators'
   $('#interviewsTitle')!.textContent = tab === 'interviews' ? 'Entretiens & transcriptions' : 'Collaborateurs du projet'
   $('#interviewsSubtitle')!.textContent = tab === 'interviews'
@@ -922,6 +925,11 @@ function attachEvents() {
   $('#dashboardActions')!.addEventListener('click', (event) => { if ((event.target as HTMLElement).closest('#addAction')) openActionDialog() })
   $('#nextMeeting')!.addEventListener('click', (event) => { const target = event.target as HTMLElement; const guide = target.closest<HTMLButtonElement>('[data-generate-guide]'); if (guide) { event.stopPropagation(); void generateInterviewGuide(guide.dataset.generateGuide!, guide); return } const button = target.closest<HTMLElement>('[data-open-next-meeting]'); if (!button) return; const meeting = upcomingCalendarEvents.find((item) => item.id === button.dataset.openNextMeeting); if (!meeting) return; calendarAnchor = new Date(meeting.start.dateTime); showView('calendar'); void refreshCalendar().then(() => openCalendarEventDialog(meeting)).catch((error) => toast(error.message, true)) })
   $('#notesInput')!.addEventListener('input', () => { window.clearTimeout(notesTimer); $('#saveState')!.textContent = 'Enregistrement…'; notesTimer = window.setTimeout(async () => { try { const result = await api<{ notes: string }>('/api/notes', { method:'PUT', body:JSON.stringify({notes:$<HTMLTextAreaElement>('#notesInput')!.value}) }); state.notes = result.notes; $('#saveState')!.textContent = 'Enregistré localement.' } catch(error) { $('#saveState')!.textContent = error instanceof Error ? error.message : 'Erreur.' } }, 500) })
+  $('#exportTranscripts')!.addEventListener('click', () => {
+    const interviews = state.interviews.filter((item) => item.transcript.trim())
+    if (!interviews.length) { toast('Aucune transcription à exporter pour cet audit.', true); return }
+    try { const count = exportTranscripts(state.project, interviews.map((item) => ({ title: item.title, participants: interviewParticipants(item), date: item.date, transcript: item.transcript, createdAt: item.createdAt }))); toast(`${count} transcription${count > 1 ? 's' : ''} exportée${count > 1 ? 's' : ''} dans tes téléchargements.`) } catch (error) { toast((error as Error).message, true) }
+  })
   $('#newInterview')!.addEventListener('click', () => void createInterview().catch((error)=>toast(error.message,true)))
   $('#newCollaborator')!.addEventListener('click', () => openCollaboratorDialog())
   $('#interviewTabs')!.addEventListener('click', (event) => { const button = (event.target as HTMLElement).closest<HTMLElement>('[data-tab]'); if (button) setInterviewTab(button.dataset.tab as 'interviews' | 'collaborators') })

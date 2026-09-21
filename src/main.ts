@@ -635,6 +635,39 @@ function openCollaboratorDialog(person?: DirectoryPerson) {
 }
 
 type ProjectListItem = { id: string; name: string; client: string; stats: { collaborators: number } }
+async function openProjectSettingsDialog() {
+  const project = state.project
+  $<HTMLInputElement>('#projectSettingsName')!.value = project.name
+  $<HTMLInputElement>('#projectSettingsClient')!.value = project.client || ''
+  $<HTMLInputElement>('#projectSettingsSector')!.value = project.sector || ''
+  $<HTMLInputElement>('#projectSettingsMission')!.value = project.missionType || ''
+  const { projects } = await api<{ projects: ProjectListItem[] }>('/api/projects')
+  const clients = [...new Set(projects.map((item) => item.client.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'))
+  $('#projectSettingsClients')!.innerHTML = clients.map((client) => `<option value="${escapeHtml(client)}"></option>`).join('')
+  const sources = projects.filter((item) => item.id !== project.id && item.stats.collaborators > 0).sort((a, b) => (a.client || a.name).localeCompare(b.client || b.name, 'fr'))
+  $<HTMLSelectElement>('#projectSettingsSource')!.innerHTML = `<option value="">Ne rien importer</option>${sources.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.client || item.name)} — ${escapeHtml(item.name)} (${item.stats.collaborators})</option>`).join('')}`
+  $<HTMLDialogElement>('#projectSettingsDialog')!.showModal()
+}
+async function saveProjectSettings(event: SubmitEvent) {
+  event.preventDefault()
+  const button = $<HTMLButtonElement>('#projectSettingsButton')!
+  setButtonLoading(button, true, 'Enregistrement…')
+  try {
+    const payload = { name: $<HTMLInputElement>('#projectSettingsName')!.value.trim(), client: $<HTMLInputElement>('#projectSettingsClient')!.value.trim(), sector: $<HTMLInputElement>('#projectSettingsSector')!.value.trim(), missionType: $<HTMLInputElement>('#projectSettingsMission')!.value.trim() }
+    const result = await api<{ project: Project }>(`/api/projects/${encodeURIComponent(state.project.id)}`, { method: 'PUT', body: JSON.stringify(payload) })
+    state.project = { ...state.project, ...result.project }
+    const sourceProjectId = $<HTMLSelectElement>('#projectSettingsSource')!.value
+    let imported = 0
+    if (sourceProjectId) {
+      const importResult = await api<{ added: DirectoryPerson[]; collaborators: DirectoryPerson[] }>('/api/collaborators/import', { method: 'POST', body: JSON.stringify({ sourceProjectId }) })
+      state.collaborators = importResult.collaborators; imported = importResult.added.length
+      syncPeopleDirectory(); renderCollaborators()
+    }
+    $<HTMLDialogElement>('#projectSettingsDialog')!.close()
+    renderProjectIdentity()
+    toast(imported ? `Projet mis à jour · ${imported} collaborateur${imported > 1 ? 's' : ''} repris.` : 'Projet mis à jour.')
+  } catch (error) { toast((error as Error).message, true) } finally { setButtonLoading(button, false) }
+}
 async function openImportCollaboratorsDialog() {
   const select = $<HTMLSelectElement>('#importCollaboratorsSource')!
   const { projects } = await api<{ projects: ProjectListItem[] }>('/api/projects')
@@ -954,6 +987,8 @@ function attachEvents() {
   })
   $('#newInterview')!.addEventListener('click', () => void createInterview().catch((error)=>toast(error.message,true)))
   $('#newCollaborator')!.addEventListener('click', () => openCollaboratorDialog())
+  $('#openProjectSettings')!.addEventListener('click', () => void openProjectSettingsDialog().catch((error) => toast(error.message, true)))
+  $<HTMLFormElement>('#projectSettingsForm')!.addEventListener('submit', (event) => void saveProjectSettings(event))
   $('#importCollaborators')!.addEventListener('click', () => void openImportCollaboratorsDialog().catch((error) => toast(error.message, true)))
   $<HTMLFormElement>('#importCollaboratorsForm')!.addEventListener('submit', (event) => void importCollaborators(event))
   $('#interviewTabs')!.addEventListener('click', (event) => { const button = (event.target as HTMLElement).closest<HTMLElement>('[data-tab]'); if (button) setInterviewTab(button.dataset.tab as 'interviews' | 'collaborators') })

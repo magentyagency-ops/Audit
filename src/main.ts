@@ -594,6 +594,7 @@ function setInterviewTab(tab: 'interviews' | 'collaborators') {
   $('#newInterview')!.hidden = tab !== 'interviews'
   $('#exportTranscripts')!.hidden = tab !== 'interviews'
   $('#newCollaborator')!.hidden = tab !== 'collaborators'
+  $('#importCollaborators')!.hidden = tab !== 'collaborators'
   $('#interviewsTitle')!.textContent = tab === 'interviews' ? 'Entretiens & transcriptions' : 'Collaborateurs du projet'
   $('#interviewsSubtitle')!.textContent = tab === 'interviews'
     ? 'Importe un fichier ou crée un entretien, puis génère une synthèse détaillée avec OpenAI.'
@@ -633,6 +634,27 @@ function openCollaboratorDialog(person?: DirectoryPerson) {
   $<HTMLDialogElement>('#collaboratorDialog')!.showModal()
 }
 
+type ProjectListItem = { id: string; name: string; client: string; stats: { collaborators: number } }
+async function openImportCollaboratorsDialog() {
+  const select = $<HTMLSelectElement>('#importCollaboratorsSource')!
+  const { projects } = await api<{ projects: ProjectListItem[] }>('/api/projects')
+  const sources = projects.filter((project) => project.id !== state.project.id && project.stats.collaborators > 0).sort((a, b) => (a.client || a.name).localeCompare(b.client || b.name, 'fr'))
+  if (!sources.length) { toast('Aucun autre audit ne contient de collaborateurs à reprendre.', true); return }
+  select.innerHTML = sources.map((project) => `<option value="${escapeHtml(project.id)}">${escapeHtml(project.client || project.name)} — ${escapeHtml(project.name)} (${project.stats.collaborators})</option>`).join('')
+  $<HTMLDialogElement>('#importCollaboratorsDialog')!.showModal()
+}
+async function importCollaborators(event: SubmitEvent) {
+  event.preventDefault()
+  const button = $<HTMLButtonElement>('#importCollaboratorsButton')!
+  setButtonLoading(button, true, 'Import…')
+  try {
+    const result = await api<{ added: DirectoryPerson[]; collaborators: DirectoryPerson[] }>('/api/collaborators/import', { method: 'POST', body: JSON.stringify({ sourceProjectId: $<HTMLSelectElement>('#importCollaboratorsSource')!.value }) })
+    state.collaborators = result.collaborators
+    $<HTMLDialogElement>('#importCollaboratorsDialog')!.close()
+    syncPeopleDirectory(); renderCollaborators()
+    toast(result.added.length ? `${result.added.length} collaborateur${result.added.length > 1 ? 's' : ''} importé${result.added.length > 1 ? 's' : ''}.` : 'Tous ces collaborateurs sont déjà dans le projet.')
+  } catch (error) { toast((error as Error).message, true) } finally { setButtonLoading(button, false) }
+}
 function syncPeopleDirectory() { peopleDirectory = state.collaborators; renderPeopleSuggestions() }
 
 async function saveCollaborator(event: SubmitEvent) {
@@ -932,6 +954,8 @@ function attachEvents() {
   })
   $('#newInterview')!.addEventListener('click', () => void createInterview().catch((error)=>toast(error.message,true)))
   $('#newCollaborator')!.addEventListener('click', () => openCollaboratorDialog())
+  $('#importCollaborators')!.addEventListener('click', () => void openImportCollaboratorsDialog().catch((error) => toast(error.message, true)))
+  $<HTMLFormElement>('#importCollaboratorsForm')!.addEventListener('submit', (event) => void importCollaborators(event))
   $('#interviewTabs')!.addEventListener('click', (event) => { const button = (event.target as HTMLElement).closest<HTMLElement>('[data-tab]'); if (button) setInterviewTab(button.dataset.tab as 'interviews' | 'collaborators') })
   $<HTMLFormElement>('#collaboratorForm')!.addEventListener('submit', (event) => void saveCollaborator(event).catch((error) => toast(error.message, true)))
   $('#deleteCollaborator')!.addEventListener('click', () => void deleteCollaborator().catch((error) => toast(error.message, true)))

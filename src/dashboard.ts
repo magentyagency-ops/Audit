@@ -6,7 +6,7 @@ type ProjectBrief = {
   name: string; client: string; sector: string; missionType: string; objective: string
   scope: string[]; stakeholders: string[]; keyQuestions: string[]; deliverables: string[]; firstSteps: string[]
 }
-type ProjectStats = { interviews: number; summaries: number; mapNodes: number; documents: number; openActions: number; lastActivityAt: string | null }
+type ProjectStats = { interviews: number; summaries: number; mapNodes: number; documents: number; collaborators: number; openActions: number; lastActivityAt: string | null }
 type Project = {
   id: string; name: string; client: string; sector: string; missionType: string; description: string
   brief: ProjectBrief | null; accent: string; archived: boolean; createdBy: string; createdByEmail: string; createdAt: string; updatedAt: string; stats: ProjectStats
@@ -115,6 +115,15 @@ async function loadProjects() {
   const result = await api<{ projects: Project[] }>('/api/projects')
   projects = result.projects
   renderProjects()
+  renderProjectSources()
+}
+
+/** Liste des audits dont on peut reprendre les collaborateurs (même entreprise, autre mission). */
+function renderProjectSources() {
+  const select = $<HTMLSelectElement>('#projectSource')
+  if (!select) return
+  const sources = projects.filter((project) => project.stats.collaborators > 0).sort((a, b) => (a.client || a.name).localeCompare(b.client || b.name, 'fr'))
+  select.innerHTML = `<option value="">Nouvelle entreprise</option>${sources.map((project) => `<option value="${escapeHtml(project.id)}">${escapeHtml(project.client || project.name)} — ${escapeHtml(project.name)} (${project.stats.collaborators} collaborateur${project.stats.collaborators > 1 ? 's' : ''})</option>`).join('')}`
 }
 
 async function createProject(event: SubmitEvent) {
@@ -122,12 +131,14 @@ async function createProject(event: SubmitEvent) {
   const button = $<HTMLButtonElement>('#createProjectButton')!
   const description = $<HTMLTextAreaElement>('#projectDescription')!.value.trim()
   const name = $<HTMLInputElement>('#projectName')!.value.trim()
+  const sourceProjectId = $<HTMLSelectElement>('#projectSource')?.value || ''
   const label = button.innerHTML
   button.disabled = true
   button.innerHTML = '<span class="spinner"></span>Préparation du contexte…'
   try {
-    const result = await api<{ project: Project; briefGenerated: boolean }>('/api/projects', { method: 'POST', body: JSON.stringify({ description, name }) })
+    const result = await api<{ project: Project; briefGenerated: boolean; importedCollaborators: number }>('/api/projects', { method: 'POST', body: JSON.stringify({ description, name, sourceProjectId }) })
     if (!result.briefGenerated) toast('Projet créé sans contexte IA : la clé OpenAI n’est pas configurée.')
+    if (result.importedCollaborators) toast(`${result.importedCollaborators} collaborateur${result.importedCollaborators > 1 ? 's' : ''} repris de l’audit précédent.`)
     openProject(result.project.id)
   } catch (error) {
     button.disabled = false

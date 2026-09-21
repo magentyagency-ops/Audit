@@ -134,6 +134,7 @@ export async function projectStats(id: string) {
       mapNodes?: unknown[]
       missionActions?: Array<{ done?: boolean }>
       contextDocuments?: unknown[]
+      collaborators?: unknown[]
       updatedAt?: string
     }>(id)) ?? {}
     const interviews = Array.isArray(parsed.interviews) ? parsed.interviews : []
@@ -143,11 +144,12 @@ export async function projectStats(id: string) {
       summaries: interviews.filter((interview) => interview.status === 'complete').length,
       mapNodes: Array.isArray(parsed.mapNodes) ? parsed.mapNodes.length : 0,
       documents: Array.isArray(parsed.contextDocuments) ? parsed.contextDocuments.length : 0,
+      collaborators: Array.isArray(parsed.collaborators) ? parsed.collaborators.length : 0,
       openActions: actions.filter((action) => !action.done).length,
       lastActivityAt: parsed.updatedAt || null,
     }
   } catch {
-    return { interviews: 0, summaries: 0, mapNodes: 0, documents: 0, openActions: 0, lastActivityAt: null }
+    return { interviews: 0, summaries: 0, mapNodes: 0, documents: 0, collaborators: 0, openActions: 0, lastActivityAt: null }
   }
 }
 

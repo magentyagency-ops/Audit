@@ -741,16 +741,25 @@ app.get('/api/projects', async (_req, res, next) => {
   } catch (error) { next(error) }
 })
 
+/** Collaborateurs d’un autre audit (même entreprise), recopiés avec de nouveaux identifiants pour rester indépendants. */
+async function collaboratorsFromProject(projectId: string) {
+  const stored = await readProjectState<Partial<MissionState>>(projectId)
+  return (Array.isArray(stored?.collaborators) ? stored.collaborators : []).map((person) => ({ ...person, id: randomUUID() }))
+}
+
 app.post('/api/projects', async (req, res, next) => {
   try {
     const description = String((req.body as { description?: string }).description || '').trim()
     const fallbackName = String((req.body as { name?: string }).name || '').trim()
+    const sourceProjectId = String((req.body as { sourceProjectId?: string }).sourceProjectId || '').trim()
     if (description.length < 12) return res.status(400).json({ error: 'Décris le projet en quelques phrases pour que l’assistant puisse démarrer avec du contexte.' })
+    const source = sourceProjectId ? await findProject(sourceProjectId) : null
+    if (sourceProjectId && !source) return res.status(404).json({ error: 'L’audit source est introuvable.' })
     const brief = openai ? await generateProjectBrief(description, fallbackName) : null
     const project = await insertProject({
       name: brief?.name || fallbackName || description.split(/[.\n]/)[0].slice(0, 60),
-      client: brief?.client || fallbackName || '',
-      sector: brief?.sector || '',
+      client: brief?.client || source?.client || fallbackName || '',
+      sector: brief?.sector || source?.sector || '',
       missionType: brief?.missionType || '',
       description,
       brief,
@@ -760,8 +769,9 @@ app.post('/api/projects', async (req, res, next) => {
     const seeded = emptyState()
     const now = new Date().toISOString()
     seeded.missionActions = (brief?.firstSteps || []).slice(0, 8).map((text: string) => ({ id: randomUUID(), text, done: false, source: 'ai' as const, createdAt: now, updatedAt: now }))
+    if (source) seeded.collaborators = await collaboratorsFromProject(source.id)
     await withProject(project, () => saveState(seeded))
-    res.status(201).json({ project, briefGenerated: Boolean(brief) })
+    res.status(201).json({ project, briefGenerated: Boolean(brief), importedCollaborators: seeded.collaborators.length })
   } catch (error) { next(error) }
 })
 
@@ -835,6 +845,19 @@ app.delete('/api/collaborators/:id', async (req, res) => {
   current.collaborators = current.collaborators.filter((person) => person.id !== deleted.id)
   await saveState(current)
   res.json({ deleted })
+})
+
+app.post('/api/collaborators/import', async (req, res) => {
+  const sourceProjectId = String((req.body as { sourceProjectId?: string }).sourceProjectId || '').trim()
+  const source = sourceProjectId ? await findProject(sourceProjectId) : null
+  if (!source) return res.status(404).json({ error: 'L’audit source est introuvable.' })
+  if (source.id === activeProject().id) return res.status(400).json({ error: 'Choisis un autre audit que celui en cours.' })
+  const current = await readState()
+  const known = new Set(current.collaborators.map((person) => person.name.trim().toLowerCase()))
+  const added = (await collaboratorsFromProject(source.id)).filter((person) => person.name.trim() && !known.has(person.name.trim().toLowerCase()))
+  current.collaborators = [...current.collaborators, ...added]
+  await saveState(current)
+  res.json({ added, collaborators: current.collaborators })
 })
 
 app.post('/api/collaborators/restore', async (req, res) => {
